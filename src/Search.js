@@ -14,8 +14,6 @@ const Search = () => {
   const fetchData = async () => {
     if (query.length >= 5) {
       const DOMAIN = process.env.REACT_APP_WHATISONTHETV_API_DOMAIN
-      console.log('in here fetcData')
-      console.log(`${DOMAIN}/search?query=${query}`)
       const response = await fetch(`${DOMAIN}/shows?query=${query}`);
       const jsonData = await response.json();
       setData(jsonData.data);
@@ -47,8 +45,6 @@ const Search = () => {
         {data ? data.map((item) => (
           <li key={item.id} className="relative">
             <a href={`/media/${item.id}`} className="block">
-
-
               <div className="w-[300px] h-[450px] group block w-full overflow-hidden rounded-lg bg-gray-100 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-100 flex justify-center items-center">
                 {item.thumbnail ? (
                   <img src={item.thumbnail} alt={item.name} className="object-contain h-full w-full" />
@@ -69,7 +65,7 @@ const Search = () => {
           </li>
         )) : null}
       </ul>
-    </div >
+    </div>
   );
 };
 
