@@ -14,6 +14,8 @@ const Search = () => {
   const fetchData = async () => {
     if (query.length >= 5) {
       const DOMAIN = process.env.REACT_APP_WHATISONTHETV_API_DOMAIN
+      console.log('in here fetcData')
+      console.log(`${DOMAIN}/search?query=${query}`)
       const response = await fetch(`${DOMAIN}/shows?query=${query}`);
       const jsonData = await response.json();
       setData(jsonData.data);
@@ -21,7 +23,7 @@ const Search = () => {
   };
 
   return (
-    <div className="p-4">
+    <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div className="mb-4">
 
         <input
@@ -44,23 +46,26 @@ const Search = () => {
       <ul className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4 xl:gap-x-8">
         {data ? data.map((item) => (
           <li key={item.id} className="relative">
+            <a href={`/media/${item.id}`} className="block">
 
-            <div className="w-[300px] h-[450px] group block w-full overflow-hidden rounded-lg bg-gray-100 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-100 flex justify-center items-center">
-              {item.thumbnail ? (
-                <img src={item.thumbnail} alt={item.name} className="object-contain h-full w-full" />
-              ) : (
-                <div className="w-[300px] h-[450px] bg-gray-200 flex items-center justify-center">
-                  <span>No Image Available</span>
-                </div>
-              )}
-            </div>
-            <p className="text-base text-left block">
-              <span className="text-sm font-medium text-gray-900">{item.name}</span>
-            </p>
-            <p className="text-sm text-left block">
-              <span className="text-sm font-medium text-gray-500">{item.year}{' '}</span>
-              {ICONS[item.type] || ""}
-            </p>
+
+              <div className="w-[300px] h-[450px] group block w-full overflow-hidden rounded-lg bg-gray-100 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-100 flex justify-center items-center">
+                {item.thumbnail ? (
+                  <img src={item.thumbnail} alt={item.name} className="object-contain h-full w-full" />
+                ) : (
+                  <div className="w-[300px] h-[450px] bg-gray-200 flex items-center justify-center">
+                    <span>No Image Available</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-base text-left block">
+                <span className="text-sm font-medium text-gray-900">{item.name}</span>
+              </p>
+              <p className="text-sm text-left block">
+                <span className="text-sm font-medium text-gray-500">{item.year}{' '}</span>
+                {ICONS[item.type] || ""}
+              </p>
+            </a>
           </li>
         )) : null}
       </ul>
