@@ -21,12 +21,12 @@ const Search = () => {
   };
 
   return (
-    <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
+    <div className="mt-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div className="mb-4">
 
         <input
           type="text"
-          className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 shadow-sm"
+          className="w-full pl-10 pr-4 py-2 pt-4 rounded-full border border-gray-300 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 shadow-sm"
           placeholder="Search..."
           value={query}
           onKeyPress={fetchData}
