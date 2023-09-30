@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import HeaderInfo from './components/HeaderInfo';
 import General from './components/General';
 import CastCrew from './components/CastCrew';
+import Filmography from './components/Filmography';
 import Seasons from './components/Seasons';
 import Lists from './components/Lists';
 import MediaImport from './components/MediaImport';
@@ -15,12 +16,20 @@ function Media() {
 
   const data = MediaImport(type, id);
 
+  /*
   const tabs = [
     { name: 'General', href: '#', current: true },
     { name: 'Cast & Crew', href: '#', current: false },
     ...(type === 'series' ? [{ name: 'Seasons', href: '#', current: false }] : []),
     { name: 'Lists', href: '#', current: false },
+  ]
+  */
 
+  const tabs = [
+    { name: 'General', href: '#', current: true },
+    ...(type === 'person' ? [{ name: 'Filmography', href: '#', current: false }] : [{ name: 'Cast & Crew', href: '#', current: false }]),
+    ...(type === 'series' ? [{ name: 'Seasons', href: '#', current: false }] : []),
+    { name: 'Lists', href: '#', current: false },
   ]
 
   const [currentTab, setCurrentTab] = useState('General');
@@ -73,6 +82,7 @@ function Media() {
         <div className="mt-4 text-left">
           {currentTab === 'General' && <General fetchedData={data} />}
           {currentTab === 'Cast & Crew' && <CastCrew fetchedData={data} />}
+          {currentTab === 'Filmography' && <Filmography fetchedData={data} />}
           {currentTab === 'Seasons' && <Seasons fetchedData={data} />}
           {currentTab === 'Lists' && <Lists fetchedData={data} />}
         </div>
