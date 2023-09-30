@@ -1,16 +1,15 @@
 const navigation = {
   main: [
-    { name: 'About', href: '#' },
-    { name: 'Blog', href: '#' },
-    { name: 'Changelog', href: '#' },
-    { name: 'Privacy', href: '#' },
+    { name: 'About', href: '/about' },
+    { name: 'Changelog', href: '/changelog' },
+    { name: 'Privacy', href: '/privacy' },
     { name: 'Colophon', href: '#' },
     { name: 'Accessibility', href: '#' },
   ],
   social: [
     {
       name: 'GitHub',
-      href: '#',
+      href: 'https://www.github.com/swmcc/whatisonthe.tv',
       icon: (props) => (
         <svg fill="currentColor" viewBox="0 0 24 24" {...props}>
           <path
