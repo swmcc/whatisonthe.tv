@@ -1,4 +1,4 @@
-.PHONY: help install install-dev setup db-up db-down db-reset dev test test-cov lint format clean
+.PHONY: help install install-dev setup db-up db-down db-reset dev dev-backend dev-frontend dev-all test test-cov lint format clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -31,11 +31,20 @@ db-reset: ## Reset databases (WARNING: destroys all data)
 	@sleep 3
 	@echo "✅ Databases reset"
 
-dev: ## Start development server
+dev: dev-backend ## Start backend development server (alias for dev-backend)
+
+dev-backend: ## Start backend development server
 	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 dev-frontend: ## Start frontend development server
-	cd frontend && npm run dev
+	cd frontend && npm run dev -- --host 0.0.0.0 --port 5173
+
+dev-all: ## Start both backend and frontend development servers concurrently
+	@echo "🚀 Starting backend and frontend servers..."
+	@trap 'kill 0' EXIT; \
+	(cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) & \
+	(cd frontend && npm run dev -- --host 0.0.0.0 --port 5173) & \
+	wait
 
 test: ## Run tests
 	cd backend && pytest
