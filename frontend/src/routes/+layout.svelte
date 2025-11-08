@@ -7,11 +7,13 @@
 	import { api } from '$lib/api';
 
 	let menuOpen = false;
+	let hasCheckedAuth = false;
 
 	// Check authentication on mount
 	onMount(async () => {
-		// Load user data if we have a token
-		if ($auth.token && !$auth.user) {
+		// Load user data if we have a token (only check once per session)
+		if ($auth.token && !$auth.user && !hasCheckedAuth) {
+			hasCheckedAuth = true;
 			try {
 				const user = await api.auth.me();
 				auth.setUser(user);
