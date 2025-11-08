@@ -23,8 +23,9 @@ def save_person_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None)
         tvdb_id: TVDB person ID
         api_data: Optional pre-fetched API data
     """
-    # Add random delay (jitter) to spread out API calls: 0-3 seconds
-    jitter = random.uniform(0, 3)
+    # Add random delay (jitter) to spread out API calls: 5-15 seconds
+    # This is background processing, so no rush - better to be nice to the API
+    jitter = random.uniform(5, 15)
     time.sleep(jitter)
 
     start_time = datetime.utcnow()
