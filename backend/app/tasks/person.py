@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from app.db.database import AsyncSessionLocal
+from app.db.database import SyncSessionLocal
 from app.models.person import Person
 from app.models.sync_log import SyncLog
 from app.services.tvdb import tvdb_service
@@ -21,27 +21,21 @@ def save_person_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None)
         tvdb_id: TVDB person ID
         api_data: Optional pre-fetched API data
     """
-    import asyncio
-    return asyncio.run(_save_person_full_async(tvdb_id, api_data))
-
-
-async def _save_person_full_async(tvdb_id: int, api_data: dict[str, Any] | None = None):
-    """Async implementation of save_person_full."""
     start_time = datetime.utcnow()
 
-    async with AsyncSessionLocal() as db:
+    with SyncSessionLocal() as db:
         try:
             # Fetch from API if not provided
             if not api_data:
                 api_data = tvdb_service.get_person_details(tvdb_id)
 
             if not api_data:
-                await _log_sync_failure(db, tvdb_id, "Person not found in TVDB API")
+                _log_sync_failure(db, tvdb_id, "Person not found in TVDB API")
                 return {"status": "failed", "error": "Person not found"}
 
             # Check if person already exists
             stmt = select(Person).where(Person.tvdb_id == tvdb_id)
-            result = await db.execute(stmt)
+            result = db.execute(stmt)
             person = result.scalar_one_or_none()
 
             # Parse name
@@ -73,24 +67,24 @@ async def _save_person_full_async(tvdb_id: int, api_data: dict[str, Any] | None 
                 )
                 db.add(person)
 
-            await db.commit()
-            await db.refresh(person)
+            db.commit()
+            db.refresh(person)
 
             # Log success
             duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
-            await _log_sync_success(db, person.id, tvdb_id, duration_ms)
-            await db.commit()
+            _log_sync_success(db, person.id, tvdb_id, duration_ms)
+            db.commit()
 
             return {"status": "success", "person_id": person.id}
 
         except Exception as e:
-            await db.rollback()
-            await _log_sync_failure(db, tvdb_id, str(e))
-            await db.commit()
+            db.rollback()
+            _log_sync_failure(db, tvdb_id, str(e))
+            db.commit()
             raise
 
 
-async def _log_sync_success(db, person_id: int, tvdb_id: int, duration_ms: int):
+def _log_sync_success(db, person_id: int, tvdb_id: int, duration_ms: int):
     """Log successful sync."""
     log = SyncLog(
         entity_type="person",
@@ -103,7 +97,7 @@ async def _log_sync_success(db, person_id: int, tvdb_id: int, duration_ms: int):
     db.add(log)
 
 
-async def _log_sync_failure(db, tvdb_id: int, error_message: str):
+def _log_sync_failure(db, tvdb_id: int, error_message: str):
     """Log failed sync."""
     log = SyncLog(
         entity_type="person",

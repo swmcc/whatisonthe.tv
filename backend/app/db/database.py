@@ -2,8 +2,9 @@
 
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
 
@@ -25,6 +26,23 @@ engine = create_async_engine(
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
+# Create sync engine for Celery tasks (convert async URL to sync)
+sync_database_url = settings.database_url.replace("+asyncpg", "").replace("postgresql+asyncpg", "postgresql")
+sync_engine = create_engine(
+    sync_database_url,
+    echo=settings.debug,
+    future=True,
+)
+
+# Create sync session factory for Celery tasks
+SyncSessionLocal = sessionmaker(
+    sync_engine,
+    class_=Session,
     expire_on_commit=False,
     autocommit=False,
     autoflush=False,
