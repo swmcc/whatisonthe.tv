@@ -16,8 +16,11 @@
 				const user = await api.auth.me();
 				auth.setUser(user);
 			} catch (err) {
-				// Silently fail - user will get logged out when they try to access a protected resource
-				console.error('Failed to load user:', err);
+				// If we can't load user data, clear the token and redirect to login
+				console.error('Failed to load user, clearing session:', err);
+				auth.logout();
+				goto('/login');
+				return;
 			}
 		}
 
