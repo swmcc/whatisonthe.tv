@@ -51,6 +51,38 @@
 			.map((a) => a.name)
 			.filter((name, index, self) => self.indexOf(name) === index); // Remove duplicates
 	}
+
+	function getUniqueCredits(characters: any[]): any[] {
+		if (!characters) return [];
+
+		// Group credits by content ID
+		const creditMap = new Map();
+
+		for (const credit of characters) {
+			const contentId = credit.seriesId || credit.movieId;
+			if (!contentId) continue;
+
+			if (!creditMap.has(contentId)) {
+				// First credit for this content - store it with role types array
+				creditMap.set(contentId, {
+					...credit,
+					roles: [credit.peopleType],
+					characterNames: credit.name ? [credit.name] : []
+				});
+			} else {
+				// Add additional role types and character names
+				const existing = creditMap.get(contentId);
+				if (credit.peopleType && !existing.roles.includes(credit.peopleType)) {
+					existing.roles.push(credit.peopleType);
+				}
+				if (credit.name && !existing.characterNames.includes(credit.name)) {
+					existing.characterNames.push(credit.name);
+				}
+			}
+		}
+
+		return Array.from(creditMap.values());
+	}
 </script>
 
 <svelte:head>
@@ -137,8 +169,9 @@
 
 		<!-- Filmography -->
 		{#if data.characters && data.characters.length > 0}
-			{@const seriesCredits = data.characters.filter((c) => c.seriesId)}
-			{@const movieCredits = data.characters.filter((c) => c.movieId)}
+			{@const uniqueCharacters = getUniqueCredits(data.characters)}
+			{@const seriesCredits = uniqueCharacters.filter((c) => c.seriesId)}
+			{@const movieCredits = uniqueCharacters.filter((c) => c.movieId)}
 
 			<div class="bg-white rounded-lg shadow-lg p-6">
 				<h2 class="text-2xl font-bold text-gray-900 mb-6">Filmography</h2>
@@ -194,9 +227,14 @@
 										<div class="flex items-center justify-between mt-1">
 											<span class="text-xs text-gray-500">{series.year || 'N/A'}</span>
 										</div>
-										{#if credit.name}
-											<p class="text-xs text-gray-600 mt-1 truncate" title={credit.name}>
-												as {credit.name}
+										{#if credit.characterNames && credit.characterNames.length > 0}
+											<p class="text-xs text-gray-600 mt-1 truncate" title={credit.characterNames.join(', ')}>
+												as {credit.characterNames.join(', ')}
+											</p>
+										{/if}
+										{#if credit.roles && credit.roles.length > 0}
+											<p class="text-xs text-indigo-600 mt-1 truncate" title={credit.roles.join(', ')}>
+												{credit.roles.join(', ')}
 											</p>
 										{/if}
 									</div>
@@ -228,9 +266,14 @@
 										<div class="flex items-center justify-between mt-1">
 											<span class="text-xs text-gray-500">{movie.year || 'N/A'}</span>
 										</div>
-										{#if credit.name}
-											<p class="text-xs text-gray-600 mt-1 truncate" title={credit.name}>
-												as {credit.name}
+										{#if credit.characterNames && credit.characterNames.length > 0}
+											<p class="text-xs text-gray-600 mt-1 truncate" title={credit.characterNames.join(', ')}>
+												as {credit.characterNames.join(', ')}
+											</p>
+										{/if}
+										{#if credit.roles && credit.roles.length > 0}
+											<p class="text-xs text-indigo-600 mt-1 truncate" title={credit.roles.join(', ')}>
+												{credit.roles.join(', ')}
 											</p>
 										{/if}
 									</div>
