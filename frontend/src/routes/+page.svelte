@@ -157,7 +157,7 @@
 				<h2 class="text-2xl font-bold text-gray-900 mb-6">
 					Results ({searchResults.length}{hasMore ? '+' : ''})
 				</h2>
-				<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+				<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
 					{#each searchResults as result}
 						<a
 							href={getResultUrl(result)}
