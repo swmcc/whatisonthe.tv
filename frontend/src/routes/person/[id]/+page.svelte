@@ -170,8 +170,8 @@
 		<!-- Filmography -->
 		{#if data.characters && data.characters.length > 0}
 			{@const uniqueCharacters = getUniqueCredits(data.characters)}
-			{@const seriesCredits = uniqueCharacters.filter((c) => c.seriesId)}
-			{@const movieCredits = uniqueCharacters.filter((c) => c.movieId)}
+			{@const seriesCredits = uniqueCharacters.filter((c) => c.seriesId && c.series)}
+			{@const movieCredits = uniqueCharacters.filter((c) => c.movieId && c.movie)}
 
 			<div class="bg-white rounded-lg shadow-lg p-6">
 				<h2 class="text-2xl font-bold text-gray-900 mb-6">Filmography</h2>
