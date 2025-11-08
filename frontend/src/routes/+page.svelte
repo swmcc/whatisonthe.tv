@@ -79,7 +79,10 @@
 				<h2 class="text-2xl font-bold text-gray-900 mb-6">Results ({searchResults.length})</h2>
 				<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
 					{#each searchResults as result}
-						<div class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
+						<a
+							href="/show/{result.id}"
+							class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer block"
+						>
 							<div class="aspect-[2/3] bg-gray-200 rounded-t-lg overflow-hidden">
 								{#if result.image_url || result.poster}
 									<img
@@ -111,7 +114,7 @@
 									{/if}
 								</div>
 							</div>
-						</div>
+						</a>
 					{/each}
 				</div>
 			</div>

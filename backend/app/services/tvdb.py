@@ -81,6 +81,18 @@ class TVDBService:
         """
         try:
             movie = self.client.get_movie_extended(movie_id)
+
+            # Movies don't have overview in extended response, fetch from translation
+            if not movie.get('overview') and movie.get('overviewTranslations'):
+                try:
+                    # Try to get English translation first
+                    if 'eng' in movie['overviewTranslations']:
+                        translation = self.client.get_movie_translation(movie_id, 'eng')
+                        if translation and 'overview' in translation:
+                            movie['overview'] = translation['overview']
+                except Exception as trans_error:
+                    print(f"Error fetching movie translation: {trans_error}")
+
             return movie
         except Exception as e:
             print(f"Error fetching movie {movie_id}: {e}")
