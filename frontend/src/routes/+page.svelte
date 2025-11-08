@@ -129,8 +129,12 @@
 		});
 	}
 
-	// Reactive statement to re-sort when sortBy changes
-	$: sortedResults = sortResults(searchResults);
+	// Reactive statement to re-sort when sortBy or searchResults changes
+	$: {
+		// Force re-evaluation when sortBy changes
+		sortBy;
+		sortedResults = sortResults(searchResults);
+	}
 </script>
 
 <svelte:head>

@@ -239,7 +239,8 @@
 				<!-- Tab Content -->
 				<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
 					{#if activeTab === 'series'}
-						{#each sortCredits(seriesCredits) as credit}
+						{#key sortBy}
+							{#each sortCredits(seriesCredits) as credit}
 							{@const series = credit.series}
 							{#if series}
 								<a
@@ -276,9 +277,11 @@
 									</div>
 								</a>
 							{/if}
-						{/each}
+							{/each}
+						{/key}
 					{:else if activeTab === 'movies'}
-						{#each sortCredits(movieCredits) as credit}
+						{#key sortBy}
+							{#each sortCredits(movieCredits) as credit}
 							{@const movie = credit.movie}
 							{#if movie}
 								<a
@@ -315,7 +318,8 @@
 									</div>
 								</a>
 							{/if}
-						{/each}
+							{/each}
+						{/key}
 					{/if}
 				</div>
 			</div>
