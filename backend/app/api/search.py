@@ -92,3 +92,20 @@ async def get_movie(movie_id: int):
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
     return movie
+
+
+@router.get("/person/{person_id}")
+async def get_person(person_id: int):
+    """
+    Get detailed information about a person (actor, director, writer, etc.).
+
+    Args:
+        person_id: TVDB person ID
+
+    Returns:
+        Detailed person information including filmography
+    """
+    person = tvdb_service.get_person_details(person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    return person

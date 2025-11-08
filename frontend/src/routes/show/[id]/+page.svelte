@@ -247,7 +247,10 @@
 				<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
 					{#if activeTab === 'actors'}
 						{#each actors as character}
-							<div class="text-center">
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
 								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
 									<img
 										src={getCharacterImage(character)}
@@ -266,11 +269,14 @@
 										{character.personName}
 									</p>
 								{/if}
-							</div>
+							</a>
 						{/each}
 					{:else if activeTab === 'directors'}
 						{#each directors as character}
-							<div class="text-center">
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
 								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
 									<img
 										src={getCharacterImage(character)}
@@ -284,11 +290,14 @@
 								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
 									{character.personName || 'Unknown'}
 								</p>
-							</div>
+							</a>
 						{/each}
 					{:else if activeTab === 'writers'}
 						{#each writers as character}
-							<div class="text-center">
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
 								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
 									<img
 										src={getCharacterImage(character)}
@@ -302,11 +311,14 @@
 								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
 									{character.personName || 'Unknown'}
 								</p>
-							</div>
+							</a>
 						{/each}
 					{:else if activeTab === 'producers'}
 						{#each producers as character}
-							<div class="text-center">
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
 								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
 									<img
 										src={getCharacterImage(character)}
@@ -321,11 +333,14 @@
 									{character.personName || 'Unknown'}
 								</p>
 								<p class="text-xs text-gray-500">{character.peopleType}</p>
-							</div>
+							</a>
 						{/each}
 					{:else if activeTab === 'other'}
 						{#each otherCrew as character}
-							<div class="text-center">
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
 								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
 									<img
 										src={getCharacterImage(character)}
@@ -342,7 +357,7 @@
 								{#if character.peopleType}
 									<p class="text-xs text-gray-500">{character.peopleType}</p>
 								{/if}
-							</div>
+							</a>
 						{/each}
 					{/if}
 				</div>

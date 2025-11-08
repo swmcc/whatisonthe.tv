@@ -87,6 +87,11 @@ export const api = {
 			return request(`/movie/${id}`, {
 				requiresAuth: true
 			});
+		},
+		getPerson: async (id: number) => {
+			return request(`/person/${id}`, {
+				requiresAuth: true
+			});
 		}
 	}
 };

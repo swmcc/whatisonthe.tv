@@ -98,6 +98,31 @@ class TVDBService:
             print(f"Error fetching movie {movie_id}: {e}")
             return None
 
+    def get_person_details(self, person_id: int) -> dict[str, Any] | None:
+        """
+        Get detailed information about a person.
+
+        Args:
+            person_id: TVDB person ID
+
+        Returns:
+            Detailed person information or None if not found
+        """
+        try:
+            person = self.client.get_person_extended(person_id)
+
+            # Get English biography if available
+            if person.get('biographies'):
+                for bio in person['biographies']:
+                    if isinstance(bio, dict) and bio.get('language') == 'eng':
+                        person['biography'] = bio.get('biography')
+                        break
+
+            return person
+        except Exception as e:
+            print(f"Error fetching person {person_id}: {e}")
+            return None
+
 
 # Singleton instance
 tvdb_service = TVDBService()
