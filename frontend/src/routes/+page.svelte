@@ -77,6 +77,17 @@
 	function getImageUrl(result: any): string {
 		return result.image_url || result.poster || '/placeholder.png';
 	}
+
+	function getResultUrl(result: any): string {
+		const type = result.type?.toLowerCase();
+		if (type === 'person') {
+			return `/person/${result.id}`;
+		} else if (type === 'movie') {
+			return `/show/${result.id}`; // Using /show for both series and movies for now
+		} else {
+			return `/show/${result.id}`; // Default to show for series
+		}
+	}
 </script>
 
 <svelte:head>
@@ -131,7 +142,7 @@
 				<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
 					{#each searchResults as result}
 						<a
-							href="/show/{result.id}"
+							href={getResultUrl(result)}
 							class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer block"
 						>
 							<div class="aspect-[2/3] bg-gray-200 rounded-t-lg overflow-hidden">
