@@ -69,23 +69,23 @@
 	<div class="max-w-2xl mx-auto mt-8 bg-red-50 border-l-4 border-red-500 p-4 rounded">
 		<p class="text-sm text-red-700">{error}</p>
 		<button
-			on:click={() => goto('/')}
+			on:click={() => window.history.back()}
 			class="mt-4 text-indigo-600 hover:text-indigo-800"
 		>
-			← Back to search
+			← Back
 		</button>
 	</div>
 {:else if data}
 	<div class="max-w-7xl mx-auto px-4 py-8">
 		<!-- Back button -->
 		<button
-			on:click={() => goto('/')}
+			on:click={() => window.history.back()}
 			class="mb-6 text-indigo-600 hover:text-indigo-800 flex items-center gap-2"
 		>
 			<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
 			</svg>
-			Back to search
+			Back
 		</button>
 
 		<!-- Header Section -->

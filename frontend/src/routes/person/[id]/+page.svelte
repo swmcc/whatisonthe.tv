@@ -103,10 +103,10 @@
 	<div class="max-w-2xl mx-auto mt-8 bg-red-50 border-l-4 border-red-500 p-4 rounded">
 		<p class="text-sm text-red-700">{error}</p>
 		<button
-			on:click={() => goto('/')}
+			on:click={() => window.history.back()}
 			class="mt-4 text-indigo-600 hover:text-indigo-800"
 		>
-			← Back to search
+			← Back
 		</button>
 	</div>
 {:else if data}
