@@ -55,6 +55,7 @@ class ContentRepository:
                 selectinload(Content.credits).selectinload(Credit.person),
                 selectinload(Content.genres),
                 selectinload(Content.series_detail),
+                selectinload(Content.aliases),
             )
         )
         result = await self.db.execute(stmt)
@@ -86,6 +87,7 @@ class ContentRepository:
                 selectinload(Content.credits).selectinload(Credit.person),
                 selectinload(Content.genres),
                 selectinload(Content.movie_detail),
+                selectinload(Content.aliases),
             )
         )
         result = await self.db.execute(stmt)
