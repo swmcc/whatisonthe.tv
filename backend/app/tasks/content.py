@@ -1,5 +1,7 @@
 """Celery tasks for content (series and movies) synchronization."""
 
+import random
+import time
 from datetime import datetime
 from typing import Any
 
@@ -28,6 +30,10 @@ def save_series_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None)
         tvdb_id: TVDB series ID
         api_data: Optional pre-fetched API data (to avoid extra API call)
     """
+    # Add random delay (jitter) to spread out API calls: 0-3 seconds
+    jitter = random.uniform(0, 3)
+    time.sleep(jitter)
+
     start_time = datetime.utcnow()
 
     with SyncSessionLocal() as db:
@@ -85,6 +91,10 @@ def save_movie_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None):
         tvdb_id: TVDB movie ID
         api_data: Optional pre-fetched API data
     """
+    # Add random delay (jitter) to spread out API calls: 0-3 seconds
+    jitter = random.uniform(0, 3)
+    time.sleep(jitter)
+
     start_time = datetime.utcnow()
 
     with SyncSessionLocal() as db:
