@@ -2,6 +2,8 @@
 	import { auth } from '$lib/stores/auth';
 	import { api } from '$lib/api';
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 
 	let searchQuery = '';
 	let searchResults: any[] = [];
@@ -16,6 +18,13 @@
 	let observer: IntersectionObserver;
 
 	onMount(() => {
+		// Restore search from URL parameter
+		const urlQuery = $page.url.searchParams.get('q');
+		if (urlQuery) {
+			searchQuery = urlQuery;
+			performSearch();
+		}
+
 		// Set up IntersectionObserver for infinite scroll
 		observer = new IntersectionObserver(
 			(entries) => {
@@ -36,8 +45,7 @@
 		observer.observe(scrollTrigger);
 	}
 
-	async function handleSearch(event: Event) {
-		event.preventDefault();
+	async function performSearch() {
 		if (!searchQuery.trim()) return;
 
 		searching = true;
@@ -56,6 +64,16 @@
 		} finally {
 			searching = false;
 		}
+	}
+
+	async function handleSearch(event: Event) {
+		event.preventDefault();
+		if (!searchQuery.trim()) return;
+
+		// Update URL with search query
+		goto(`/?q=${encodeURIComponent(searchQuery)}`, { replaceState: false });
+
+		await performSearch();
 	}
 
 	async function loadMoreResults() {
