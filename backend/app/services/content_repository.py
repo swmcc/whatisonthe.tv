@@ -1,6 +1,6 @@
 """Content repository for DB-first lookup with async caching."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -159,7 +159,7 @@ class ContentRepository:
         if not content.last_synced_at:
             return False
 
-        threshold = datetime.utcnow() - timedelta(days=self.sync_threshold_days)
+        threshold = datetime.now(timezone.utc) - timedelta(days=self.sync_threshold_days)
         return content.last_synced_at > threshold
 
     def _is_person_fresh(self, person: Person) -> bool:
@@ -168,7 +168,7 @@ class ContentRepository:
             return False
 
         # People can be stale for longer (14 days)
-        threshold = datetime.utcnow() - timedelta(days=14)
+        threshold = datetime.now(timezone.utc) - timedelta(days=14)
         return person.last_synced_at > threshold
 
     def _content_to_dict(self, content: Content) -> dict[str, Any]:
