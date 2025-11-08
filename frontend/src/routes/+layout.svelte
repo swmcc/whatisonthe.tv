@@ -33,7 +33,7 @@
 
 {#if $page.url.pathname === '/login'}
 	<slot />
-{:else if $auth.user}
+{:else if $auth.token && $auth.user}
 	<div class="min-h-screen bg-gray-50">
 		<!-- Navigation -->
 		<nav class="bg-white shadow-sm">
