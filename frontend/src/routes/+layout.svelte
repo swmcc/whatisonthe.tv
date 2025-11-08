@@ -33,10 +33,11 @@
 
 {#if $page.url.pathname === '/login'}
 	<slot />
-{:else if $auth.token && $auth.user}
-	<div class="min-h-screen bg-gray-50">
-		<!-- Navigation -->
-		<nav class="bg-white shadow-sm">
+{:else if $auth.token}
+	{#if $auth.user}
+		<div class="min-h-screen bg-gray-50">
+			<!-- Navigation -->
+			<nav class="bg-white shadow-sm">
 			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 				<div class="flex justify-between h-16">
 					<div class="flex">
@@ -178,6 +179,7 @@
 			<slot />
 		</main>
 	</div>
+	{/if}
 {:else}
 	<!-- Loading state -->
 	<div class="min-h-screen bg-gray-50 flex items-center justify-center">
