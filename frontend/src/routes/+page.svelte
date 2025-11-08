@@ -13,6 +13,7 @@
 	let hasMore = false;
 	let currentOffset = 0;
 	const PAGE_SIZE = 20;
+	let sortBy: 'relevance' | 'year-desc' | 'year-asc' | 'name-asc' | 'name-desc' = 'relevance';
 
 	let scrollTrigger: HTMLDivElement;
 	let observer: IntersectionObserver;
@@ -106,6 +107,30 @@
 			return `/show/${result.id}`; // Default to show for series
 		}
 	}
+
+	function sortResults(results: any[]): any[] {
+		if (sortBy === 'relevance') {
+			return results; // Keep original order (API relevance)
+		}
+
+		return [...results].sort((a, b) => {
+			switch (sortBy) {
+				case 'year-desc':
+					return (parseInt(b.year) || 0) - (parseInt(a.year) || 0);
+				case 'year-asc':
+					return (parseInt(a.year) || 0) - (parseInt(b.year) || 0);
+				case 'name-asc':
+					return (a.name || '').localeCompare(b.name || '');
+				case 'name-desc':
+					return (b.name || '').localeCompare(a.name || '');
+				default:
+					return 0;
+			}
+		});
+	}
+
+	// Reactive statement to re-sort when sortBy changes
+	$: sortedResults = sortResults(searchResults);
 </script>
 
 <svelte:head>
@@ -154,11 +179,27 @@
 
 		{#if searchResults.length > 0}
 			<div class="mt-8">
-				<h2 class="text-2xl font-bold text-gray-900 mb-6">
-					Results ({searchResults.length}{hasMore ? '+' : ''})
-				</h2>
+				<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+					<h2 class="text-2xl font-bold text-gray-900">
+						Results ({searchResults.length}{hasMore ? '+' : ''})
+					</h2>
+					<div class="flex items-center gap-2">
+						<label for="sort" class="text-sm font-medium text-gray-700">Sort by:</label>
+						<select
+							id="sort"
+							bind:value={sortBy}
+							class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+						>
+							<option value="relevance">Relevance</option>
+							<option value="year-desc">Year (Newest)</option>
+							<option value="year-asc">Year (Oldest)</option>
+							<option value="name-asc">Name (A-Z)</option>
+							<option value="name-desc">Name (Z-A)</option>
+						</select>
+					</div>
+				</div>
 				<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
-					{#each searchResults as result}
+					{#each sortedResults as result}
 						<a
 							href={getResultUrl(result)}
 							class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer block"

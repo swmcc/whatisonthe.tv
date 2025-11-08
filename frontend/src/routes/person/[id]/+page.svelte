@@ -8,6 +8,7 @@
 	let error = '';
 	let data: any = null;
 	let activeTab = 'series';
+	let sortBy: 'year-desc' | 'year-asc' | 'name-asc' | 'name-desc' = 'year-desc';
 
 	const id = $page.params.id;
 
@@ -82,6 +83,26 @@
 		}
 
 		return Array.from(creditMap.values());
+	}
+
+	function sortCredits(credits: any[]): any[] {
+		return [...credits].sort((a, b) => {
+			const aContent = a.series || a.movie;
+			const bContent = b.series || b.movie;
+
+			switch (sortBy) {
+				case 'year-desc':
+					return (parseInt(bContent?.year) || 0) - (parseInt(aContent?.year) || 0);
+				case 'year-asc':
+					return (parseInt(aContent?.year) || 0) - (parseInt(bContent?.year) || 0);
+				case 'name-asc':
+					return (aContent?.name || '').localeCompare(bContent?.name || '');
+				case 'name-desc':
+					return (bContent?.name || '').localeCompare(aContent?.name || '');
+				default:
+					return 0;
+			}
+		});
 	}
 </script>
 
@@ -174,7 +195,22 @@
 			{@const movieCredits = uniqueCharacters.filter((c) => c.movieId && c.movie)}
 
 			<div class="bg-white rounded-lg shadow-lg p-6">
-				<h2 class="text-2xl font-bold text-gray-900 mb-6">Filmography</h2>
+				<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+					<h2 class="text-2xl font-bold text-gray-900">Filmography</h2>
+					<div class="flex items-center gap-2">
+						<label for="sort-filmography" class="text-sm font-medium text-gray-700">Sort by:</label>
+						<select
+							id="sort-filmography"
+							bind:value={sortBy}
+							class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+						>
+							<option value="year-desc">Year (Newest)</option>
+							<option value="year-asc">Year (Oldest)</option>
+							<option value="name-asc">Name (A-Z)</option>
+							<option value="name-desc">Name (Z-A)</option>
+						</select>
+					</div>
+				</div>
 
 				<!-- Tabs -->
 				<div class="border-b border-gray-200 mb-6">
@@ -203,7 +239,7 @@
 				<!-- Tab Content -->
 				<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
 					{#if activeTab === 'series'}
-						{#each seriesCredits as credit}
+						{#each sortCredits(seriesCredits) as credit}
 							{@const series = credit.series}
 							{#if series}
 								<a
@@ -242,7 +278,7 @@
 							{/if}
 						{/each}
 					{:else if activeTab === 'movies'}
-						{#each movieCredits as credit}
+						{#each sortCredits(movieCredits) as credit}
 							{@const movie = credit.movie}
 							{#if movie}
 								<a
