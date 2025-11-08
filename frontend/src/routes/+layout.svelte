@@ -10,14 +10,14 @@
 
 	// Check authentication on mount
 	onMount(async () => {
+		// Load user data if we have a token
 		if ($auth.token && !$auth.user) {
 			try {
 				const user = await api.auth.me();
 				auth.setUser(user);
 			} catch (err) {
-				// Don't logout on errors - the api.ts will handle invalid tokens
-				// This prevents logout on network errors or server restarts
-				console.error('Failed to fetch user info:', err);
+				// Silently fail - user will get logged out when they try to access a protected resource
+				console.error('Failed to load user:', err);
 			}
 		}
 
