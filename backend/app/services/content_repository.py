@@ -113,7 +113,10 @@ class ContentRepository:
         stmt = (
             select(Person)
             .where(Person.tvdb_id == tvdb_id)
-            .options(selectinload(Person.credits).selectinload(Credit.content))
+            .options(
+                selectinload(Person.credits).selectinload(Credit.content),
+                selectinload(Person.aliases)
+            )
         )
         result = await self.db.execute(stmt)
         person = result.scalar_one_or_none()
