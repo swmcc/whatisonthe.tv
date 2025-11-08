@@ -31,31 +31,46 @@ class SearchResponse(BaseModel):
     query: str
     results: list[SearchResult]
     count: int
+    offset: int
+    has_more: bool
 
 
 @router.get("/search", response_model=SearchResponse)
 async def search(
     q: str = Query(..., min_length=1, description="Search query"),
-    limit: int = Query(10, ge=1, le=50, description="Maximum number of results"),
+    limit: int = Query(20, ge=1, le=50, description="Number of results per page"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Search for TV shows and movies.
+    Search for TV shows and movies with pagination support.
 
     Args:
         q: Search query string
-        limit: Maximum number of results (default: 10, max: 50)
+        limit: Number of results per page (default: 20, max: 50)
+        offset: Starting position for pagination (default: 0)
 
     Returns:
-        Search results with metadata
+        Search results with metadata including pagination info
     """
     try:
         repo = ContentRepository(db)
-        results = await repo.search(q, limit=limit)
+        # Request one extra to check if there are more results
+        results = await repo.search(q, limit=limit + 1, offset=offset)
+
+        # Check if there are more results
+        has_more = len(results) > limit
+
+        # Return only the requested number of results
+        if has_more:
+            results = results[:limit]
+
         return SearchResponse(
             query=q,
             results=results,
-            count=len(results)
+            count=len(results),
+            offset=offset,
+            has_more=has_more
         )
     except Exception as e:
         raise HTTPException(

@@ -16,13 +16,14 @@ class TVDBService:
             pin=settings.tvdb_pin
         )
 
-    def search(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+    def search(self, query: str, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
         """
-        Search for TV shows and movies.
+        Search for TV shows and movies with pagination support.
 
         Args:
             query: Search query string
             limit: Maximum number of results to return
+            offset: Starting position for pagination
 
         Returns:
             List of search results with basic information
@@ -30,9 +31,13 @@ class TVDBService:
         try:
             results = self.client.search(query)
 
+            # Apply offset and limit
+            start_idx = offset
+            end_idx = offset + limit
+
             # Process and format results
             formatted_results = []
-            for result in results[:limit]:
+            for result in results[start_idx:end_idx]:
                 formatted_result = {
                     "id": result.get("tvdb_id"),
                     "name": result.get("name"),

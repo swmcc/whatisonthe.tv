@@ -134,9 +134,9 @@ class ContentRepository:
         # Return API data immediately
         return api_data
 
-    async def search(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+    async def search(self, query: str, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
         """
-        Search for content.
+        Search for content with pagination support.
 
         Note: Search always hits API for freshness.
         Results are NOT auto-cached (to avoid DB bloat).
@@ -144,14 +144,15 @@ class ContentRepository:
 
         Args:
             query: Search query
-            limit: Max results
+            limit: Max results per page
+            offset: Starting position for pagination
 
         Returns:
             List of search results
         """
         # For now, just search API
         # Could add DB search for already-cached content as optimization
-        return tvdb_service.search(query, limit)
+        return tvdb_service.search(query, limit, offset)
 
     def _is_fresh(self, content: Content) -> bool:
         """Check if content is fresh enough."""

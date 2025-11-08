@@ -1,11 +1,40 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth';
 	import { api } from '$lib/api';
+	import { onMount } from 'svelte';
 
 	let searchQuery = '';
 	let searchResults: any[] = [];
 	let searching = false;
+	let loadingMore = false;
 	let error = '';
+	let hasMore = false;
+	let currentOffset = 0;
+	const PAGE_SIZE = 20;
+
+	let scrollTrigger: HTMLDivElement;
+	let observer: IntersectionObserver;
+
+	onMount(() => {
+		// Set up IntersectionObserver for infinite scroll
+		observer = new IntersectionObserver(
+			(entries) => {
+				const entry = entries[0];
+				if (entry.isIntersecting && hasMore && !loadingMore && !searching) {
+					loadMoreResults();
+				}
+			},
+			{ rootMargin: '100px' }
+		);
+
+		return () => {
+			if (observer) observer.disconnect();
+		};
+	});
+
+	$: if (scrollTrigger && observer) {
+		observer.observe(scrollTrigger);
+	}
 
 	async function handleSearch(event: Event) {
 		event.preventDefault();
@@ -14,14 +43,34 @@
 		searching = true;
 		error = '';
 		searchResults = [];
+		currentOffset = 0;
+		hasMore = false;
 
 		try {
-			const response = await api.search.query(searchQuery, 20);
+			const response = await api.search.query(searchQuery, PAGE_SIZE, 0);
 			searchResults = response.results || [];
+			hasMore = response.has_more || false;
+			currentOffset = PAGE_SIZE;
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Search failed';
 		} finally {
 			searching = false;
+		}
+	}
+
+	async function loadMoreResults() {
+		if (!hasMore || loadingMore || searching) return;
+
+		loadingMore = true;
+		try {
+			const response = await api.search.query(searchQuery, PAGE_SIZE, currentOffset);
+			searchResults = [...searchResults, ...(response.results || [])];
+			hasMore = response.has_more || false;
+			currentOffset += PAGE_SIZE;
+		} catch (err) {
+			console.error('Failed to load more results:', err);
+		} finally {
+			loadingMore = false;
 		}
 	}
 
@@ -76,7 +125,9 @@
 
 		{#if searchResults.length > 0}
 			<div class="mt-8">
-				<h2 class="text-2xl font-bold text-gray-900 mb-6">Results ({searchResults.length})</h2>
+				<h2 class="text-2xl font-bold text-gray-900 mb-6">
+					Results ({searchResults.length}{hasMore ? '+' : ''})
+				</h2>
 				<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
 					{#each searchResults as result}
 						<a
@@ -117,6 +168,27 @@
 						</a>
 					{/each}
 				</div>
+
+				<!-- Infinite scroll trigger -->
+				{#if hasMore}
+					<div bind:this={scrollTrigger} class="mt-8 flex justify-center">
+						{#if loadingMore}
+							<div class="flex items-center gap-2 text-gray-600">
+								<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								<span>Loading more results...</span>
+							</div>
+						{:else}
+							<div class="text-gray-400 text-sm">Scroll to load more</div>
+						{/if}
+					</div>
+				{:else if searchResults.length > 0}
+					<div class="mt-8 text-center text-gray-500 text-sm">
+						No more results
+					</div>
+				{/if}
 			</div>
 		{:else if !searching && searchQuery}
 			<div class="text-center text-gray-500 mt-8">

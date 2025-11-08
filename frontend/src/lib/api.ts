@@ -73,8 +73,8 @@ export const api = {
 		}
 	},
 	search: {
-		query: async (q: string, limit: number = 10) => {
-			return request(`/search?q=${encodeURIComponent(q)}&limit=${limit}`, {
+		query: async (q: string, limit: number = 20, offset: number = 0) => {
+			return request(`/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`, {
 				requiresAuth: true
 			});
 		},
