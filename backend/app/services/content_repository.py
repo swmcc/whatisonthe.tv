@@ -215,12 +215,16 @@ class ContentRepository:
 
     def _person_to_dict(self, person: Person) -> dict[str, Any]:
         """Convert Person model to API-compatible dict."""
-        return {
+        result = {
             "id": person.tvdb_id,
             "tvdb_id": person.tvdb_id,
             "name": person.full_name,
             "biography": person.biography,
             "image": person.image_url,
+            "aliases": [
+                {"name": a.name, "language": a.language}
+                for a in person.aliases
+            ],
             "characters": [
                 {
                     "seriesId": c.content.tvdb_id if c.content.is_series else None,
@@ -241,3 +245,9 @@ class ContentRepository:
                 for c in person.credits
             ],
         }
+
+        # Include extra metadata if available
+        if person.extra_metadata:
+            result.update(person.extra_metadata)
+
+        return result
