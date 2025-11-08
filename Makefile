@@ -1,4 +1,4 @@
-.PHONY: help install install-dev setup db-up db-down db-reset dev dev-backend dev-frontend dev-all test test-cov lint format clean
+.PHONY: help install install-dev setup db-up db-down db-reset db-migrate db-upgrade db-downgrade db-revision dev dev-backend dev-frontend dev-all test test-cov lint format clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -30,6 +30,17 @@ db-reset: ## Reset databases (WARNING: destroys all data)
 	docker-compose up -d
 	@sleep 3
 	@echo "✅ Databases reset"
+
+db-migrate: ## Run database migrations
+	cd backend && python3 -m alembic upgrade head
+
+db-upgrade: db-migrate ## Alias for db-migrate
+
+db-downgrade: ## Rollback last migration
+	cd backend && python3 -m alembic downgrade -1
+
+db-revision: ## Create new migration (use MSG="description")
+	cd backend && python3 -m alembic revision --autogenerate -m "$(MSG)"
 
 dev: dev-backend ## Start backend development server (alias for dev-backend)
 

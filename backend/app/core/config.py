@@ -26,9 +26,15 @@ class Settings(BaseSettings):
 
     # TVDB API
     tvdb_api_key: str = ""
+    tvdb_pin: str = ""
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"]
+
+    # Security
+    secret_key: str = "your-secret-key-change-in-production-min-32-chars-long"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
 
 settings = Settings()
