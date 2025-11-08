@@ -51,7 +51,7 @@ dev-frontend: ## Start frontend development server
 	cd frontend && npm run dev -- --host 0.0.0.0 --port 5173
 
 dev-worker: ## Start Celery worker for background tasks
-	cd backend && celery -A app.workers.celery_app worker --loglevel=info
+	cd backend && celery -A app.workers.celery_app worker --loglevel=info -Q celery,content,person,scheduled
 
 dev-beat: ## Start Celery beat scheduler for periodic tasks
 	cd backend && celery -A app.workers.celery_app beat --loglevel=info
@@ -64,7 +64,7 @@ dev-all: ## Start backend, frontend, and Celery worker concurrently
 	@trap 'kill 0' EXIT; \
 	(cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) & \
 	(cd frontend && npm run dev -- --host 0.0.0.0 --port 5173) & \
-	(cd backend && celery -A app.workers.celery_app worker --loglevel=info) & \
+	(cd backend && celery -A app.workers.celery_app worker --loglevel=info -Q celery,content,person,scheduled) & \
 	wait
 
 test: ## Run tests
