@@ -28,10 +28,17 @@ async function request(endpoint: string, options: RequestOptions = {}) {
 	});
 
 	if (!response.ok) {
-		if (response.status === 401) {
-			auth.logout();
-		}
 		const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
+
+		// Only logout on 401 for auth-related endpoints (token truly invalid)
+		// Don't logout on network errors, server restarts, or other temporary issues
+		if (response.status === 401 && requiresAuth) {
+			// Check if this is an actual authentication failure (not server error)
+			if (error.detail?.includes('Invalid') || error.detail?.includes('Unauthorized') || error.detail?.includes('expired')) {
+				auth.logout();
+			}
+		}
+
 		throw new Error(error.detail || `HTTP error ${response.status}`);
 	}
 

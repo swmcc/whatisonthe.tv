@@ -15,7 +15,9 @@
 				const user = await api.auth.me();
 				auth.setUser(user);
 			} catch (err) {
-				auth.logout();
+				// Don't logout on errors - the api.ts will handle invalid tokens
+				// This prevents logout on network errors or server restarts
+				console.error('Failed to fetch user info:', err);
 			}
 		}
 
