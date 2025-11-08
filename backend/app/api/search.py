@@ -1,9 +1,11 @@
 """Search API endpoints."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.tvdb import tvdb_service
+from app.db.database import get_db
+from app.services.content_repository import ContentRepository
 
 router = APIRouter()
 
@@ -34,7 +36,8 @@ class SearchResponse(BaseModel):
 @router.get("/search", response_model=SearchResponse)
 async def search(
     q: str = Query(..., min_length=1, description="Search query"),
-    limit: int = Query(10, ge=1, le=50, description="Maximum number of results")
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of results"),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Search for TV shows and movies.
@@ -47,7 +50,8 @@ async def search(
         Search results with metadata
     """
     try:
-        results = tvdb_service.search(q, limit=limit)
+        repo = ContentRepository(db)
+        results = await repo.search(q, limit=limit)
         return SearchResponse(
             query=q,
             results=results,
@@ -61,9 +65,16 @@ async def search(
 
 
 @router.get("/series/{series_id}")
-async def get_series(series_id: int):
+async def get_series(series_id: int, db: AsyncSession = Depends(get_db)):
     """
     Get detailed information about a TV series.
+
+    This uses DB-first caching with async background sync:
+    1. Check DB for cached data
+    2. If found and fresh (<7 days), return from DB
+    3. If not found or stale, get from API
+    4. Queue background task to save/update DB
+    5. Return API data immediately (fast!)
 
     Args:
         series_id: TVDB series ID
@@ -71,16 +82,19 @@ async def get_series(series_id: int):
     Returns:
         Detailed series information
     """
-    series = tvdb_service.get_series_details(series_id)
+    repo = ContentRepository(db)
+    series = await repo.get_series(series_id)
     if not series:
         raise HTTPException(status_code=404, detail="Series not found")
     return series
 
 
 @router.get("/movie/{movie_id}")
-async def get_movie(movie_id: int):
+async def get_movie(movie_id: int, db: AsyncSession = Depends(get_db)):
     """
     Get detailed information about a movie.
+
+    This uses DB-first caching with async background sync.
 
     Args:
         movie_id: TVDB movie ID
@@ -88,16 +102,19 @@ async def get_movie(movie_id: int):
     Returns:
         Detailed movie information
     """
-    movie = tvdb_service.get_movie_details(movie_id)
+    repo = ContentRepository(db)
+    movie = await repo.get_movie(movie_id)
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
     return movie
 
 
 @router.get("/person/{person_id}")
-async def get_person(person_id: int):
+async def get_person(person_id: int, db: AsyncSession = Depends(get_db)):
     """
     Get detailed information about a person (actor, director, writer, etc.).
+
+    This uses DB-first caching with async background sync.
 
     Args:
         person_id: TVDB person ID
@@ -105,7 +122,8 @@ async def get_person(person_id: int):
     Returns:
         Detailed person information including filmography
     """
-    person = tvdb_service.get_person_details(person_id)
+    repo = ContentRepository(db)
+    person = await repo.get_person(person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
     return person

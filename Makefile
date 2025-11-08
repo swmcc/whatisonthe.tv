@@ -1,4 +1,4 @@
-.PHONY: help install install-dev setup db-up db-down db-reset db-migrate db-upgrade db-downgrade db-revision dev dev-backend dev-frontend dev-all test test-cov lint format clean
+.PHONY: help install install-dev setup db-up db-down db-reset db-migrate db-upgrade db-downgrade db-revision dev dev-backend dev-frontend dev-worker dev-beat dev-flower dev-all test test-cov lint format clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -50,11 +50,21 @@ dev-backend: ## Start backend development server
 dev-frontend: ## Start frontend development server
 	cd frontend && npm run dev -- --host 0.0.0.0 --port 5173
 
-dev-all: ## Start both backend and frontend development servers concurrently
-	@echo "🚀 Starting backend and frontend servers..."
+dev-worker: ## Start Celery worker for background tasks
+	cd backend && celery -A app.workers.celery_app worker --loglevel=info
+
+dev-beat: ## Start Celery beat scheduler for periodic tasks
+	cd backend && celery -A app.workers.celery_app beat --loglevel=info
+
+dev-flower: ## Start Flower monitoring UI (http://localhost:5555)
+	cd backend && celery -A app.workers.celery_app flower
+
+dev-all: ## Start backend, frontend, and Celery worker concurrently
+	@echo "🚀 Starting all services (backend, frontend, worker)..."
 	@trap 'kill 0' EXIT; \
 	(cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) & \
 	(cd frontend && npm run dev -- --host 0.0.0.0 --port 5173) & \
+	(cd backend && celery -A app.workers.celery_app worker --loglevel=info) & \
 	wait
 
 test: ## Run tests

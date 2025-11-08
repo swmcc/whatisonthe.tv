@@ -1,0 +1,368 @@
+"""Celery tasks for content (series and movies) synchronization."""
+
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+
+from app.db.database import AsyncSessionLocal
+from app.models.content import Content
+from app.models.series_detail import SeriesDetail
+from app.models.movie_detail import MovieDetail
+from app.models.genre import Genre
+from app.models.credit import Credit
+from app.models.person import Person
+from app.models.alias import Alias
+from app.models.sync_log import SyncLog
+from app.services.tvdb import tvdb_service
+from app.workers.celery_app import celery_app
+
+
+@celery_app.task(bind=True, max_retries=3)
+def save_series_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None):
+    """
+    Save complete series data to database.
+
+    Args:
+        tvdb_id: TVDB series ID
+        api_data: Optional pre-fetched API data (to avoid extra API call)
+    """
+    import asyncio
+    return asyncio.run(_save_series_full_async(tvdb_id, api_data))
+
+
+async def _save_series_full_async(tvdb_id: int, api_data: dict[str, Any] | None = None):
+    """Async implementation of save_series_full."""
+    start_time = datetime.utcnow()
+
+    async with AsyncSessionLocal() as db:
+        try:
+            # Fetch from API if not provided
+            if not api_data:
+                api_data = tvdb_service.get_series_details(tvdb_id)
+
+            if not api_data:
+                await _log_sync_failure(db, "content", tvdb_id, "Series not found in TVDB API")
+                return {"status": "failed", "error": "Series not found"}
+
+            # Check if content already exists
+            stmt = select(Content).where(Content.tvdb_id == tvdb_id, Content.content_type == "series")
+            result = await db.execute(stmt)
+            content = result.scalar_one_or_none()
+
+            if content:
+                # Update existing
+                content = await _update_series(db, content, api_data)
+            else:
+                # Create new
+                content = await _create_series(db, tvdb_id, api_data)
+
+            await db.commit()
+            await db.refresh(content)
+
+            # Save related data (genres, credits, aliases)
+            await _save_genres(db, content, api_data.get("genres", []))
+            await _save_credits(db, content, api_data.get("characters", []))
+            await _save_aliases(db, content.id, "content", api_data.get("aliases", []))
+
+            await db.commit()
+
+            # Log success
+            duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            await _log_sync_success(db, "content", content.id, tvdb_id, duration_ms)
+            await db.commit()
+
+            return {"status": "success", "content_id": content.id}
+
+        except Exception as e:
+            await db.rollback()
+            await _log_sync_failure(db, "content", tvdb_id, str(e))
+            await db.commit()
+            raise
+
+
+@celery_app.task(bind=True, max_retries=3)
+def save_movie_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None):
+    """
+    Save complete movie data to database.
+
+    Args:
+        tvdb_id: TVDB movie ID
+        api_data: Optional pre-fetched API data
+    """
+    import asyncio
+    return asyncio.run(_save_movie_full_async(tvdb_id, api_data))
+
+
+async def _save_movie_full_async(tvdb_id: int, api_data: dict[str, Any] | None = None):
+    """Async implementation of save_movie_full."""
+    start_time = datetime.utcnow()
+
+    async with AsyncSessionLocal() as db:
+        try:
+            # Fetch from API if not provided
+            if not api_data:
+                api_data = tvdb_service.get_movie_details(tvdb_id)
+
+            if not api_data:
+                await _log_sync_failure(db, "content", tvdb_id, "Movie not found in TVDB API")
+                return {"status": "failed", "error": "Movie not found"}
+
+            # Check if content already exists
+            stmt = select(Content).where(Content.tvdb_id == tvdb_id, Content.content_type == "movie")
+            result = await db.execute(stmt)
+            content = result.scalar_one_or_none()
+
+            if content:
+                # Update existing
+                content = await _update_movie(db, content, api_data)
+            else:
+                # Create new
+                content = await _create_movie(db, tvdb_id, api_data)
+
+            await db.commit()
+            await db.refresh(content)
+
+            # Save related data
+            await _save_genres(db, content, api_data.get("genres", []))
+            await _save_credits(db, content, api_data.get("characters", []))
+            await _save_aliases(db, content.id, "content", api_data.get("aliases", []))
+
+            await db.commit()
+
+            # Log success
+            duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            await _log_sync_success(db, "content", content.id, tvdb_id, duration_ms)
+            await db.commit()
+
+            return {"status": "success", "content_id": content.id}
+
+        except Exception as e:
+            await db.rollback()
+            await _log_sync_failure(db, "content", tvdb_id, str(e))
+            await db.commit()
+            raise
+
+
+# Helper functions
+
+async def _create_series(db, tvdb_id: int, api_data: dict) -> Content:
+    """Create new series content."""
+    content = Content(
+        tvdb_id=tvdb_id,
+        content_type="series",
+        name=api_data.get("name"),
+        overview=api_data.get("overview"),
+        year=api_data.get("year"),
+        status=api_data.get("status", {}).get("name") if isinstance(api_data.get("status"), dict) else api_data.get("status"),
+        image_url=api_data.get("image"),
+        original_language=api_data.get("originalLanguage"),
+        original_country=api_data.get("originalCountry"),
+        last_synced_at=datetime.utcnow(),
+        extra_metadata=api_data
+    )
+    db.add(content)
+    await db.flush()
+
+    # Add series details
+    series_detail = SeriesDetail(
+        content_id=content.id,
+        number_of_seasons=api_data.get("numberOfSeasons"),
+        number_of_episodes=api_data.get("numberOfEpisodes"),
+        average_runtime=api_data.get("averageRuntime"),
+    )
+    db.add(series_detail)
+
+    return content
+
+
+async def _update_series(db, content: Content, api_data: dict) -> Content:
+    """Update existing series content."""
+    content.name = api_data.get("name")
+    content.overview = api_data.get("overview")
+    content.year = api_data.get("year")
+    content.status = api_data.get("status", {}).get("name") if isinstance(api_data.get("status"), dict) else api_data.get("status")
+    content.image_url = api_data.get("image")
+    content.last_synced_at = datetime.utcnow()
+    content.extra_metadata = api_data
+
+    # Update series details
+    if content.series_detail:
+        content.series_detail.number_of_seasons = api_data.get("numberOfSeasons")
+        content.series_detail.number_of_episodes = api_data.get("numberOfEpisodes")
+        content.series_detail.average_runtime = api_data.get("averageRuntime")
+
+    return content
+
+
+async def _create_movie(db, tvdb_id: int, api_data: dict) -> Content:
+    """Create new movie content."""
+    content = Content(
+        tvdb_id=tvdb_id,
+        content_type="movie",
+        name=api_data.get("name"),
+        overview=api_data.get("overview"),
+        year=api_data.get("year"),
+        status=api_data.get("status", {}).get("name") if isinstance(api_data.get("status"), dict) else api_data.get("status"),
+        image_url=api_data.get("image"),
+        original_language=api_data.get("originalLanguage"),
+        original_country=api_data.get("originalCountry"),
+        last_synced_at=datetime.utcnow(),
+        extra_metadata=api_data
+    )
+    db.add(content)
+    await db.flush()
+
+    # Add movie details
+    movie_detail = MovieDetail(
+        content_id=content.id,
+        runtime=api_data.get("runtime"),
+    )
+    db.add(movie_detail)
+
+    return content
+
+
+async def _update_movie(db, content: Content, api_data: dict) -> Content:
+    """Update existing movie content."""
+    content.name = api_data.get("name")
+    content.overview = api_data.get("overview")
+    content.year = api_data.get("year")
+    content.status = api_data.get("status", {}).get("name") if isinstance(api_data.get("status"), dict) else api_data.get("status")
+    content.image_url = api_data.get("image")
+    content.last_synced_at = datetime.utcnow()
+    content.extra_metadata = api_data
+
+    # Update movie details
+    if content.movie_detail:
+        content.movie_detail.runtime = api_data.get("runtime")
+
+    return content
+
+
+async def _save_genres(db, content: Content, genres_data: list):
+    """Save genres for content."""
+    if not genres_data:
+        return
+
+    for genre_data in genres_data:
+        genre_name = genre_data.get("name")
+        if not genre_name:
+            continue
+
+        # Get or create genre
+        stmt = select(Genre).where(Genre.name == genre_name)
+        result = await db.execute(stmt)
+        genre = result.scalar_one_or_none()
+
+        if not genre:
+            genre = Genre(
+                tvdb_id=genre_data.get("id"),
+                name=genre_name,
+                slug=genre_name.lower().replace(" ", "-")
+            )
+            db.add(genre)
+            await db.flush()
+
+        # Add to content if not already added
+        if genre not in content.genres:
+            content.genres.append(genre)
+
+
+async def _save_credits(db, content: Content, characters_data: list):
+    """Save credits (cast and crew) for content."""
+    if not characters_data:
+        return
+
+    # Clear existing credits
+    stmt = select(Credit).where(Credit.content_id == content.id)
+    result = await db.execute(stmt)
+    existing_credits = result.scalars().all()
+    for credit in existing_credits:
+        await db.delete(credit)
+
+    for char_data in characters_data:
+        person_id = char_data.get("peopleId")
+        if not person_id:
+            continue
+
+        # Get or create person (minimal data, full sync happens in person tasks)
+        stmt = select(Person).where(Person.tvdb_id == person_id)
+        result = await db.execute(stmt)
+        person = result.scalar_one_or_none()
+
+        if not person:
+            person_name = char_data.get("personName", "Unknown")
+            person = Person(
+                tvdb_id=person_id,
+                full_name=person_name,
+                last_synced_at=None  # Mark as needing sync
+            )
+            db.add(person)
+            await db.flush()
+
+        # Create credit
+        role_type_map = {
+            "Actor": "actor",
+            "Director": "director",
+            "Writer": "writer",
+            "Producer": "producer",
+            "Executive Producer": "executive_producer",
+        }
+        role_type = role_type_map.get(char_data.get("peopleType"), "crew")
+
+        credit = Credit(
+            content_id=content.id,
+            person_id=person.id,
+            role_type=role_type,
+            character_name=char_data.get("name") if role_type == "actor" else None,
+            sort_order=char_data.get("sort", 999)
+        )
+        db.add(credit)
+
+
+async def _save_aliases(db, entity_id: int, entity_type: str, aliases_data: list):
+    """Save aliases for content or person."""
+    if not aliases_data:
+        return
+
+    for alias_data in aliases_data:
+        alias_name = alias_data.get("name")
+        alias_lang = alias_data.get("language", "eng")
+
+        if not alias_name:
+            continue
+
+        alias = Alias(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            name=alias_name,
+            language=alias_lang
+        )
+        db.add(alias)
+
+
+async def _log_sync_success(db, entity_type: str, entity_id: int, tvdb_id: int, duration_ms: int):
+    """Log successful sync."""
+    log = SyncLog(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        tvdb_id=tvdb_id,
+        sync_status="success",
+        sync_type="full",
+        duration_ms=duration_ms
+    )
+    db.add(log)
+
+
+async def _log_sync_failure(db, entity_type: str, tvdb_id: int, error_message: str):
+    """Log failed sync."""
+    log = SyncLog(
+        entity_type=entity_type,
+        tvdb_id=tvdb_id,
+        sync_status="failed",
+        sync_type="full",
+        error_message=error_message
+    )
+    db.add(log)

@@ -29,3 +29,7 @@ python-multipart==0.0.6
 
 # TVDB API
 tvdb_v4_official==1.1.0
+
+# Task queue
+celery==5.3.6
+flower==2.0.1
