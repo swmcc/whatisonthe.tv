@@ -7,26 +7,9 @@
 	import { api } from '$lib/api';
 
 	let menuOpen = false;
-	let hasCheckedAuth = false;
 
-	// Check authentication on mount
+	// Check authentication on mount - just redirect to login if no token
 	onMount(async () => {
-		// Load user data if we have a token (only check once per session)
-		if ($auth.token && !$auth.user && !hasCheckedAuth) {
-			hasCheckedAuth = true;
-			try {
-				const user = await api.auth.me();
-				auth.setUser(user);
-			} catch (err) {
-				// If we can't load user data, clear the token and redirect to login
-				console.error('Failed to load user, clearing session:', err);
-				auth.logout();
-				goto('/login');
-				return;
-			}
-		}
-
-		// Redirect to login if not authenticated (except on login page)
 		if (!$auth.token && $page.url.pathname !== '/login') {
 			goto('/login');
 		}
