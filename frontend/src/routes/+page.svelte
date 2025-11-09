@@ -7,6 +7,7 @@
 
 	let searchQuery = '';
 	let searchResults: any[] = [];
+	let sortedResults: any[] = [];
 	let searching = false;
 	let loadingMore = false;
 	let error = '';
