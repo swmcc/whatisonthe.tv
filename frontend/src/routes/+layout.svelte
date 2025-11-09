@@ -7,14 +7,9 @@
 	import { api } from '$lib/api';
 
 	let menuOpen = false;
-	let isReady = false;
 
 	// Check authentication on mount - just redirect to login if no token
 	onMount(async () => {
-		// Wait a tick to ensure store is fully initialized
-		await new Promise(resolve => setTimeout(resolve, 0));
-		isReady = true;
-
 		if (!$auth.token && $page.url.pathname !== '/login') {
 			goto('/login');
 		}
@@ -38,7 +33,7 @@
 
 {#if $page.url.pathname === '/login'}
 	<slot />
-{:else if $auth.token && $auth.user && isReady}
+{:else if $auth.token && $auth.user}
 	<div class="min-h-screen bg-gray-50">
 		<!-- Navigation -->
 		<nav class="bg-white shadow-sm">
@@ -183,4 +178,7 @@
 			<slot />
 		</main>
 	</div>
+{:else}
+	<!-- Fallback - just show blank page, onMount will redirect to login if needed -->
+	<div class="min-h-screen bg-gray-50"></div>
 {/if}
