@@ -35,14 +35,17 @@
 		}
 	}
 
+	const PLACEHOLDER_PERSON = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="500" height="750"%3E%3Crect fill="%23e5e7eb" width="500" height="750"/%3E%3Ctext fill="%236b7280" font-family="Arial" font-size="24" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
+	const PLACEHOLDER_POSTER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="450"%3E%3Crect fill="%23e5e7eb" width="300" height="450"/%3E%3Ctext fill="%236b7280" font-family="Arial" font-size="20" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3ENo Poster%3C/text%3E%3C/svg%3E';
+
 	function getPersonImage(imageUrl: string | null | undefined): string {
-		if (!imageUrl) return 'https://via.placeholder.com/500x750?text=No+Image';
+		if (!imageUrl) return PLACEHOLDER_PERSON;
 		return imageUrl;
 	}
 
 	function getPosterUrl(item: any): string {
 		if (item.image) return item.image;
-		return 'https://via.placeholder.com/300x450?text=No+Poster';
+		return PLACEHOLDER_POSTER;
 	}
 
 	function getEnglishAliases(aliases: any[] | undefined): string[] {
@@ -153,7 +156,7 @@
 						alt={data.name}
 						class="w-full h-auto object-cover"
 						on:error={(e) => {
-							e.currentTarget.src = 'https://via.placeholder.com/500x750?text=No+Image';
+							e.currentTarget.src = PLACEHOLDER_PERSON;
 						}}
 					/>
 				</div>
@@ -253,7 +256,7 @@
 											alt={series.name}
 											class="w-full h-full object-cover"
 											on:error={(e) => {
-												e.currentTarget.src = 'https://via.placeholder.com/300x450?text=No+Poster';
+												e.currentTarget.src = PLACEHOLDER_POSTER;
 											}}
 										/>
 									</div>
@@ -294,7 +297,7 @@
 											alt={movie.name}
 											class="w-full h-full object-cover"
 											on:error={(e) => {
-												e.currentTarget.src = 'https://via.placeholder.com/300x450?text=No+Poster';
+												e.currentTarget.src = PLACEHOLDER_POSTER;
 											}}
 										/>
 									</div>
