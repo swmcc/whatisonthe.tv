@@ -1,22 +1,24 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page, navigating } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth';
 	import { api } from '$lib/api';
 
 	let menuOpen = false;
+	let hasAuthChecked = false;
 
 	// Check authentication on mount - just redirect to login if no token
 	onMount(async () => {
+		hasAuthChecked = true;
 		if (!$auth.token && $page.url.pathname !== '/login') {
 			goto('/login');
 		}
 	});
 
 	// Reactive: redirect to home if authenticated and on login page
-	$: if ($auth.token && $page.url.pathname === '/login') {
+	$: if (hasAuthChecked && $auth.token && $page.url.pathname === '/login') {
 		goto('/');
 	}
 
@@ -33,7 +35,7 @@
 
 {#if $page.url.pathname === '/login'}
 	<slot />
-{:else if $auth.token && $auth.user}
+{:else if $auth.token}
 	<div class="min-h-screen bg-gray-50">
 		<!-- Navigation -->
 		<nav class="bg-white shadow-sm">
@@ -67,6 +69,7 @@
 
 					<div class="hidden sm:ml-6 sm:flex sm:items-center">
 						<div class="relative">
+							{#if $auth.user}
 							<button
 								on:click={() => menuOpen = !menuOpen}
 								class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -94,6 +97,7 @@
 										</button>
 									</div>
 								</div>
+							{/if}
 							{/if}
 						</div>
 					</div>
@@ -145,6 +149,7 @@
 						</a>
 					</div>
 					<div class="pt-4 pb-3 border-t border-gray-200">
+						{#if $auth.user}
 						<div class="flex items-center px-4">
 							<div class="flex-shrink-0">
 								<div class="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-medium">
@@ -160,6 +165,7 @@
 								</div>
 							</div>
 						</div>
+						{/if}
 						<div class="mt-3 space-y-1">
 							<button
 								on:click={handleLogout}
