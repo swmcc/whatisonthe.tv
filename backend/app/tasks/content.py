@@ -17,6 +17,8 @@ from app.models.credit import Credit
 from app.models.person import Person
 from app.models.alias import Alias
 from app.models.sync_log import SyncLog
+from app.models.season import Season
+from app.models.episode import Episode
 from app.services.tvdb import tvdb_service
 from app.workers.celery_app import celery_app
 
@@ -66,6 +68,9 @@ def save_series_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None)
             _save_genres(db, content, api_data.get("genres", []))
             _save_credits(db, content, api_data.get("characters", []))
             _save_aliases(db, content.id, "content", api_data.get("aliases", []))
+
+            # Save seasons and episodes for series
+            _save_seasons_and_episodes(db, content, tvdb_id, api_data)
 
             db.commit()
 
@@ -348,6 +353,146 @@ def _save_aliases(db, entity_id: int, entity_type: str, aliases_data: list):
             language=alias_lang
         )
         db.add(alias)
+
+
+def _save_seasons_and_episodes(db, content: Content, tvdb_id: int, api_data: dict):
+    """Save seasons and episodes for a series."""
+    # Get seasons data from API response
+    seasons_data = api_data.get("seasons", [])
+
+    if not seasons_data:
+        return
+
+    # Get existing seasons for this content
+    stmt = select(Season).where(Season.content_id == content.id)
+    result = db.execute(stmt)
+    existing_seasons = {s.tvdb_id: s for s in result.scalars().all()}
+
+    # Process each season
+    for season_data in seasons_data:
+        season_tvdb_id = season_data.get("id")
+        if not season_tvdb_id:
+            continue
+
+        season_number = season_data.get("number", 0)
+        season_type = season_data.get("type", {})
+
+        if season_tvdb_id in existing_seasons:
+            # Update existing season
+            season = existing_seasons[season_tvdb_id]
+            season.season_number = season_number
+            season.name = season_data.get("name")
+            season.overview = season_data.get("overview")
+            season.image_url = season_data.get("image")
+            season.season_type = season_type.get("name") if isinstance(season_type, dict) else None
+            season.season_type_id = season_type.get("id") if isinstance(season_type, dict) else None
+            season.year = season_data.get("year")
+            season.last_synced_at = datetime.utcnow()
+            season.extra_metadata = season_data
+        else:
+            # Create new season
+            season = Season(
+                tvdb_id=season_tvdb_id,
+                content_id=content.id,
+                season_number=season_number,
+                name=season_data.get("name"),
+                overview=season_data.get("overview"),
+                image_url=season_data.get("image"),
+                season_type=season_type.get("name") if isinstance(season_type, dict) else None,
+                season_type_id=season_type.get("id") if isinstance(season_type, dict) else None,
+                year=season_data.get("year"),
+                last_synced_at=datetime.utcnow(),
+                extra_metadata=season_data
+            )
+            db.add(season)
+
+    db.flush()
+
+    # Now fetch and save episodes
+    episodes_response = tvdb_service.get_series_episodes(tvdb_id)
+    if not episodes_response:
+        return
+
+    episodes_data = episodes_response.get("episodes", [])
+    if not episodes_data:
+        return
+
+    # Get existing episodes for this content
+    stmt = select(Episode).where(Episode.content_id == content.id)
+    result = db.execute(stmt)
+    existing_episodes = {e.tvdb_id: e for e in result.scalars().all()}
+
+    # Get season mapping (for linking episodes to seasons)
+    stmt = select(Season).where(Season.content_id == content.id)
+    result = db.execute(stmt)
+    seasons_by_number = {s.season_number: s for s in result.scalars().all()}
+
+    # Process each episode
+    for episode_data in episodes_data:
+        episode_tvdb_id = episode_data.get("id")
+        if not episode_tvdb_id:
+            continue
+
+        season_number = episode_data.get("seasonNumber", 0)
+        episode_number = episode_data.get("number", 0)
+
+        # Find matching season
+        season = seasons_by_number.get(season_number)
+
+        # Parse aired date
+        aired_str = episode_data.get("aired")
+        aired_date = None
+        if aired_str:
+            try:
+                from datetime import datetime as dt
+                aired_date = dt.strptime(aired_str, "%Y-%m-%d").date()
+            except:
+                pass
+
+        if episode_tvdb_id in existing_episodes:
+            # Update existing episode
+            episode = existing_episodes[episode_tvdb_id]
+            episode.season_id = season.id if season else None
+            episode.season_number = season_number
+            episode.episode_number = episode_number
+            episode.absolute_number = episode_data.get("absoluteNumber")
+            episode.name = episode_data.get("name")
+            episode.overview = episode_data.get("overview")
+            episode.image_url = episode_data.get("image")
+            episode.aired = aired_date
+            episode.runtime = episode_data.get("runtime")
+            episode.year = episode_data.get("year")
+            episode.is_movie = episode_data.get("isMovie", 0)
+            episode.finale_type = episode_data.get("finaleType")
+            episode.airs_before_season = episode_data.get("airsBeforeSeason")
+            episode.airs_before_episode = episode_data.get("airsBeforeEpisode")
+            episode.airs_after_season = episode_data.get("airsAfterSeason")
+            episode.last_synced_at = datetime.utcnow()
+            episode.extra_metadata = episode_data
+        else:
+            # Create new episode
+            episode = Episode(
+                tvdb_id=episode_tvdb_id,
+                content_id=content.id,
+                season_id=season.id if season else None,
+                season_number=season_number,
+                episode_number=episode_number,
+                absolute_number=episode_data.get("absoluteNumber"),
+                name=episode_data.get("name"),
+                overview=episode_data.get("overview"),
+                image_url=episode_data.get("image"),
+                aired=aired_date,
+                runtime=episode_data.get("runtime"),
+                year=episode_data.get("year"),
+                is_movie=episode_data.get("isMovie", 0),
+                finale_type=episode_data.get("finaleType"),
+                airs_before_season=episode_data.get("airsBeforeSeason"),
+                airs_before_episode=episode_data.get("airsBeforeEpisode"),
+                airs_after_season=episode_data.get("airsAfterSeason"),
+                last_synced_at=datetime.utcnow(),
+                extra_metadata=episode_data
+            )
+            db.add(episode)
 
 
 def _log_sync_success(db, entity_type: str, entity_id: int, tvdb_id: int, duration_ms: int):

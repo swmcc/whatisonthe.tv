@@ -89,6 +89,21 @@ export const api = {
 			return request(`/person/${id}`, {
 				requiresAuth: true
 			});
+		},
+		getSeriesSeasons: async (id: number) => {
+			return request(`/series/${id}/seasons`, {
+				requiresAuth: true
+			});
+		},
+		getSeriesEpisodes: async (id: number) => {
+			return request(`/series/${id}/episodes`, {
+				requiresAuth: true
+			});
+		},
+		getSeasonEpisodes: async (id: number, seasonNumber: number) => {
+			return request(`/series/${id}/season/${seasonNumber}/episodes`, {
+				requiresAuth: true
+			});
 		}
 	}
 };

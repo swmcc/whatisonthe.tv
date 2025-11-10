@@ -10,6 +10,8 @@ from sqlalchemy.orm import selectinload
 from app.models.content import Content
 from app.models.person import Person
 from app.models.credit import Credit
+from app.models.season import Season
+from app.models.episode import Episode
 from app.services.tvdb import tvdb_service
 from app.tasks.content import save_series_full, save_movie_full
 from app.tasks.person import save_person_full
@@ -139,6 +141,115 @@ class ContentRepository:
         # Return API data immediately
         return api_data
 
+    async def get_series_seasons(self, tvdb_id: int) -> list[dict[str, Any]]:
+        """
+        Get all seasons for a series - DB first.
+
+        Args:
+            tvdb_id: TVDB series ID
+
+        Returns:
+            List of season dicts
+        """
+        # First check if content exists and is fresh
+        stmt = select(Content).where(
+            Content.tvdb_id == tvdb_id,
+            Content.content_type == "series"
+        )
+        result = await self.db.execute(stmt)
+        content = result.scalar_one_or_none()
+
+        if not content:
+            return []
+
+        # If content is fresh, get seasons from DB
+        if self._is_fresh(content):
+            stmt = (
+                select(Season)
+                .where(Season.content_id == content.id)
+                .order_by(Season.season_number)
+            )
+            result = await self.db.execute(stmt)
+            seasons = result.scalars().all()
+            return [self._season_to_dict(season) for season in seasons]
+
+        # Content is stale - return empty and let background task refresh
+        return []
+
+    async def get_series_episodes(self, tvdb_id: int) -> list[dict[str, Any]]:
+        """
+        Get all episodes for a series - DB first.
+
+        Args:
+            tvdb_id: TVDB series ID
+
+        Returns:
+            List of episode dicts
+        """
+        # First check if content exists and is fresh
+        stmt = select(Content).where(
+            Content.tvdb_id == tvdb_id,
+            Content.content_type == "series"
+        )
+        result = await self.db.execute(stmt)
+        content = result.scalar_one_or_none()
+
+        if not content:
+            return []
+
+        # If content is fresh, get episodes from DB
+        if self._is_fresh(content):
+            stmt = (
+                select(Episode)
+                .where(Episode.content_id == content.id)
+                .order_by(Episode.season_number, Episode.episode_number)
+            )
+            result = await self.db.execute(stmt)
+            episodes = result.scalars().all()
+            return [self._episode_to_dict(episode) for episode in episodes]
+
+        # Content is stale - return empty and let background task refresh
+        return []
+
+    async def get_season_episodes(self, tvdb_id: int, season_number: int) -> list[dict[str, Any]]:
+        """
+        Get episodes for a specific season - DB first.
+
+        Args:
+            tvdb_id: TVDB series ID
+            season_number: Season number
+
+        Returns:
+            List of episode dicts
+        """
+        # First check if content exists and is fresh
+        stmt = select(Content).where(
+            Content.tvdb_id == tvdb_id,
+            Content.content_type == "series"
+        )
+        result = await self.db.execute(stmt)
+        content = result.scalar_one_or_none()
+
+        if not content:
+            return []
+
+        # If content is fresh, get episodes for this season from DB
+        if self._is_fresh(content):
+            stmt = (
+                select(Episode)
+                .where(
+                    Episode.content_id == content.id,
+                    Episode.season_number == season_number
+                )
+                .order_by(Episode.episode_number)
+            )
+            result = await self.db.execute(stmt)
+            episodes = result.scalars().all()
+            return [self._episode_to_dict(episode) for episode in episodes]
+
+        # Content is stale - return empty and let background task refresh
+        return []
+
     async def search(self, query: str, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
         """
         Search for content with pagination support.
@@ -256,3 +367,48 @@ class ContentRepository:
             result.update(person.extra_metadata)
 
         return result
+
+    def _season_to_dict(self, season: Season) -> dict[str, Any]:
+        """Convert Season model to API-compatible dict."""
+        return {
+            "id": season.tvdb_id,
+            "tvdb_id": season.tvdb_id,
+            "season_number": season.season_number,
+            "number": season.season_number,
+            "name": season.name,
+            "overview": season.overview,
+            "image": season.image_url,
+            "image_url": season.image_url,
+            "type": {
+                "id": season.season_type_id,
+                "name": season.season_type,
+                "type": season.season_type,
+            } if season.season_type else None,
+            "year": season.year,
+            "last_synced_at": season.last_synced_at.isoformat() if season.last_synced_at else None,
+        }
+
+    def _episode_to_dict(self, episode: Episode) -> dict[str, Any]:
+        """Convert Episode model to API-compatible dict."""
+        return {
+            "id": episode.tvdb_id,
+            "tvdb_id": episode.tvdb_id,
+            "season_number": episode.season_number,
+            "episode_number": episode.episode_number,
+            "seasonNumber": episode.season_number,
+            "number": episode.episode_number,
+            "absoluteNumber": episode.absolute_number,
+            "name": episode.name,
+            "overview": episode.overview,
+            "image": episode.image_url,
+            "image_url": episode.image_url,
+            "aired": episode.aired.isoformat() if episode.aired else None,
+            "runtime": episode.runtime,
+            "year": episode.year,
+            "isMovie": episode.is_movie,
+            "finaleType": episode.finale_type,
+            "airsBeforeSeason": episode.airs_before_season,
+            "airsBeforeEpisode": episode.airs_before_episode,
+            "airsAfterSeason": episode.airs_after_season,
+            "last_synced_at": episode.last_synced_at.isoformat() if episode.last_synced_at else None,
+        }

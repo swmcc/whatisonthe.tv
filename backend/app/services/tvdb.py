@@ -128,6 +128,24 @@ class TVDBService:
             print(f"Error fetching person {person_id}: {e}")
             return None
 
+    def get_series_episodes(self, series_id: int, season_type: str = 'default') -> dict[str, Any] | None:
+        """
+        Get all episodes for a series.
+
+        Args:
+            series_id: TVDB series ID
+            season_type: Type of season ordering (default, dvd, absolute, etc.)
+
+        Returns:
+            Dict with 'series' and 'episodes' keys, or None if not found
+        """
+        try:
+            response = self.client.get_series_episodes(series_id, season_type=season_type)
+            return response
+        except Exception as e:
+            print(f"Error fetching episodes for series {series_id}: {e}")
+            return None
+
 
 # Singleton instance
 tvdb_service = TVDBService()

@@ -142,3 +142,62 @@ async def get_person(person_id: int, db: AsyncSession = Depends(get_db)):
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
     return person
+
+
+@router.get("/series/{series_id}/seasons")
+async def get_series_seasons(series_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Get all seasons for a TV series.
+
+    This uses DB-first caching - returns data from DB if parent series is fresh.
+
+    Args:
+        series_id: TVDB series ID
+
+    Returns:
+        List of seasons for the series
+    """
+    repo = ContentRepository(db)
+    seasons = await repo.get_series_seasons(series_id)
+    return {"seasons": seasons, "count": len(seasons)}
+
+
+@router.get("/series/{series_id}/episodes")
+async def get_series_episodes(series_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Get all episodes for a TV series.
+
+    This uses DB-first caching - returns data from DB if parent series is fresh.
+
+    Args:
+        series_id: TVDB series ID
+
+    Returns:
+        List of all episodes for the series
+    """
+    repo = ContentRepository(db)
+    episodes = await repo.get_series_episodes(series_id)
+    return {"episodes": episodes, "count": len(episodes)}
+
+
+@router.get("/series/{series_id}/season/{season_number}/episodes")
+async def get_season_episodes(
+    series_id: int,
+    season_number: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get episodes for a specific season of a TV series.
+
+    This uses DB-first caching - returns data from DB if parent series is fresh.
+
+    Args:
+        series_id: TVDB series ID
+        season_number: Season number
+
+    Returns:
+        List of episodes for the specified season
+    """
+    repo = ContentRepository(db)
+    episodes = await repo.get_season_episodes(series_id, season_number)
+    return {"season_number": season_number, "episodes": episodes, "count": len(episodes)}
