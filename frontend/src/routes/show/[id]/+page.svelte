@@ -66,7 +66,16 @@
 		loadingSeasons = true;
 		try {
 			const response = await api.search.getSeriesSeasons(parseInt(id));
-			seasons = response.seasons || [];
+			let seasonsList = response.seasons || [];
+
+			// Sort seasons: regular seasons first (1, 2, 3...), then season 0 at the end
+			seasonsList.sort((a, b) => {
+				if (a.season_number === 0) return 1;
+				if (b.season_number === 0) return -1;
+				return a.season_number - b.season_number;
+			});
+
+			seasons = seasonsList;
 
 			// Load episodes for each season
 			for (const season of seasons) {
@@ -327,8 +336,12 @@
 										<div class="flex items-center gap-4">
 											<div>
 												<h3 class="text-lg font-semibold text-gray-900">
-													Season {season.season_number}
-													{#if season.name && season.name !== `Season ${season.season_number}`}
+													{#if season.season_number === 0}
+														Special Episodes
+													{:else}
+														Season {season.season_number}
+													{/if}
+													{#if season.name && season.name !== `Season ${season.season_number}` && season.season_number !== 0}
 														<span class="text-gray-600">- {season.name}</span>
 													{/if}
 												</h3>
