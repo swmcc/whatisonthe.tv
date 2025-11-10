@@ -248,6 +248,9 @@ def _update_movie(db, content: Content, api_data: dict) -> Content:
 
 def _save_genres(db, content: Content, genres_data: list):
     """Save genres for content."""
+    # Clear existing genre associations
+    content.genres.clear()
+
     if not genres_data:
         return
 
@@ -270,9 +273,8 @@ def _save_genres(db, content: Content, genres_data: list):
             db.add(genre)
             db.flush()
 
-        # Add to content if not already added
-        if genre not in content.genres:
-            content.genres.append(genre)
+        # Add to content (no need to check, we cleared above)
+        content.genres.append(genre)
 
 
 def _save_credits(db, content: Content, characters_data: list):
@@ -286,6 +288,9 @@ def _save_credits(db, content: Content, characters_data: list):
     existing_credits = result.scalars().all()
     for credit in existing_credits:
         db.delete(credit)
+
+    # Flush deletes to avoid unique constraint violations
+    db.flush()
 
     for char_data in characters_data:
         person_id = char_data.get("peopleId")
@@ -338,6 +343,19 @@ def _save_aliases(db, entity_id: int, entity_type: str, aliases_data: list):
     """Save aliases for content or person."""
     if not aliases_data:
         return
+
+    # Clear existing aliases
+    stmt = select(Alias).where(
+        Alias.entity_type == entity_type,
+        Alias.entity_id == entity_id
+    )
+    result = db.execute(stmt)
+    existing_aliases = result.scalars().all()
+    for alias in existing_aliases:
+        db.delete(alias)
+
+    # Flush deletes to avoid potential duplicates
+    db.flush()
 
     for alias_data in aliases_data:
         alias_name = alias_data.get("name")
