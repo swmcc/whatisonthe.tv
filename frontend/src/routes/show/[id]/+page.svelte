@@ -8,7 +8,8 @@
 	let error = '';
 	let data: any = null;
 	let isSeries = true;
-	let activeTab = 'actors';
+	let activeMainTab = 'cast-crew';
+	let activeCrewTab = 'actors';
 	let seasons: any[] = [];
 	let loadingSeasons = false;
 	let expandedSeasons = new Set<number>();
@@ -252,61 +253,23 @@
 			{@const otherCrew = sortedCharacters.filter(c => c.peopleType !== 'Actor' && c.peopleType !== 'Director' && c.peopleType !== 'Writer' && c.peopleType !== 'Executive Producer' && c.peopleType !== 'Producer')}
 
 			<div class="bg-white rounded-lg shadow-lg p-6">
-				<h2 class="text-2xl font-bold text-gray-900 mb-6">{isSeries && seasons.length > 0 ? 'Cast, Crew & Episodes' : 'Cast & Crew'}</h2>
-
-				<!-- Tabs -->
+				<!-- Main Tabs -->
 				<div class="border-b border-gray-200 mb-6">
 					<nav class="-mb-px flex space-x-8">
-						{#if actors.length > 0}
+						{#if data.characters && data.characters.length > 0}
 							<button
-								on:click={() => activeTab = 'actors'}
-								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-									{activeTab === 'actors' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+								on:click={() => activeMainTab = 'cast-crew'}
+								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-base transition-colors
+									{activeMainTab === 'cast-crew' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
 							>
-								Cast ({actors.length})
-							</button>
-						{/if}
-						{#if directors.length > 0}
-							<button
-								on:click={() => activeTab = 'directors'}
-								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-									{activeTab === 'directors' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
-							>
-								Directors ({directors.length})
-							</button>
-						{/if}
-						{#if writers.length > 0}
-							<button
-								on:click={() => activeTab = 'writers'}
-								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-									{activeTab === 'writers' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
-							>
-								Writers ({writers.length})
-							</button>
-						{/if}
-						{#if producers.length > 0}
-							<button
-								on:click={() => activeTab = 'producers'}
-								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-									{activeTab === 'producers' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
-							>
-								Producers ({producers.length})
-							</button>
-						{/if}
-						{#if otherCrew.length > 0}
-							<button
-								on:click={() => activeTab = 'other'}
-								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-									{activeTab === 'other' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
-							>
-								Other ({otherCrew.length})
+								Cast & Crew
 							</button>
 						{/if}
 						{#if isSeries && seasons.length > 0}
 							<button
-								on:click={() => activeTab = 'seasons'}
-								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-									{activeTab === 'seasons' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+								on:click={() => activeMainTab = 'seasons'}
+								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-base transition-colors
+									{activeMainTab === 'seasons' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
 							>
 								Seasons ({seasons.length})
 							</button>
@@ -314,8 +277,179 @@
 					</nav>
 				</div>
 
-				<!-- Tab Content -->
-				{#if activeTab === 'seasons'}
+				<!-- Main Tab Content -->
+				{#if activeMainTab === 'cast-crew'}
+					<!-- Crew Sub-Tabs -->
+					<div class="border-b border-gray-200 mb-6">
+						<nav class="-mb-px flex space-x-8">
+							{#if actors.length > 0}
+								<button
+									on:click={() => activeCrewTab = 'actors'}
+									class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
+										{activeCrewTab === 'actors' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+								>
+									Cast ({actors.length})
+								</button>
+							{/if}
+							{#if directors.length > 0}
+								<button
+									on:click={() => activeCrewTab = 'directors'}
+									class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
+										{activeCrewTab === 'directors' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+								>
+									Directors ({directors.length})
+								</button>
+							{/if}
+							{#if writers.length > 0}
+								<button
+									on:click={() => activeCrewTab = 'writers'}
+									class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
+										{activeCrewTab === 'writers' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+								>
+									Writers ({writers.length})
+								</button>
+							{/if}
+							{#if producers.length > 0}
+								<button
+									on:click={() => activeCrewTab = 'producers'}
+									class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
+										{activeCrewTab === 'producers' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+								>
+									Producers ({producers.length})
+								</button>
+							{/if}
+							{#if otherCrew.length > 0}
+								<button
+									on:click={() => activeCrewTab = 'other'}
+									class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
+										{activeCrewTab === 'other' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+								>
+									Other ({otherCrew.length})
+								</button>
+							{/if}
+						</nav>
+					</div>
+
+					<!-- Crew Content -->
+					<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
+						{#if activeCrewTab === 'actors'}
+						{#each actors as character}
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
+								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
+									<img
+										src={getCharacterImage(character)}
+										alt={character.name || character.personName}
+										class="w-full h-full object-cover"
+										on:error={(e) => {
+											e.currentTarget.src = PLACEHOLDER_PERSON;
+										}}
+									/>
+								</div>
+								<p class="font-semibold text-sm text-gray-900 truncate" title={character.name}>
+									{character.name || 'Unknown'}
+								</p>
+								{#if character.personName}
+									<p class="text-xs text-gray-600 truncate" title={character.personName}>
+										{character.personName}
+									</p>
+								{/if}
+							</a>
+						{/each}
+					{:else if activeCrewTab === 'directors'}
+						{#each directors as character}
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
+								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
+									<img
+										src={getCharacterImage(character)}
+										alt={character.personName}
+										class="w-full h-full object-cover"
+										on:error={(e) => {
+											e.currentTarget.src = PLACEHOLDER_PERSON;
+										}}
+									/>
+								</div>
+								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
+									{character.personName || 'Unknown'}
+								</p>
+							</a>
+						{/each}
+					{:else if activeCrewTab === 'writers'}
+						{#each writers as character}
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
+								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
+									<img
+										src={getCharacterImage(character)}
+										alt={character.personName}
+										class="w-full h-full object-cover"
+										on:error={(e) => {
+											e.currentTarget.src = PLACEHOLDER_PERSON;
+										}}
+									/>
+								</div>
+								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
+									{character.personName || 'Unknown'}
+								</p>
+							</a>
+						{/each}
+					{:else if activeCrewTab === 'producers'}
+						{#each producers as character}
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
+								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
+									<img
+										src={getCharacterImage(character)}
+										alt={character.personName}
+										class="w-full h-full object-cover"
+										on:error={(e) => {
+											e.currentTarget.src = PLACEHOLDER_PERSON;
+										}}
+									/>
+								</div>
+								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
+									{character.personName || 'Unknown'}
+								</p>
+								<p class="text-xs text-gray-500">{character.peopleType}</p>
+							</a>
+						{/each}
+					{:else if activeCrewTab === 'other'}
+						{#each otherCrew as character}
+							<a
+								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
+								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
+							>
+								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
+									<img
+										src={getCharacterImage(character)}
+										alt={character.personName}
+										class="w-full h-full object-cover"
+										on:error={(e) => {
+											e.currentTarget.src = PLACEHOLDER_PERSON;
+										}}
+									/>
+								</div>
+								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
+									{character.personName || 'Unknown'}
+								</p>
+								{#if character.peopleType}
+									<p class="text-xs text-gray-500">{character.peopleType}</p>
+								{/if}
+							</a>
+						{/each}
+					{/if}
+					</div>
+
+				{:else if activeMainTab === 'seasons'}
 					<!-- Seasons Tab -->
 					{#if loadingSeasons}
 						<div class="flex items-center justify-center py-8">
@@ -410,125 +544,6 @@
 							{/each}
 						</div>
 					{/if}
-				{:else}
-					<!-- Cast & Crew Tabs -->
-					<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
-						{#if activeTab === 'actors'}
-						{#each actors as character}
-							<a
-								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
-								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
-							>
-								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
-									<img
-										src={getCharacterImage(character)}
-										alt={character.name || character.personName}
-										class="w-full h-full object-cover"
-										on:error={(e) => {
-											e.currentTarget.src = PLACEHOLDER_PERSON;
-										}}
-									/>
-								</div>
-								<p class="font-semibold text-sm text-gray-900 truncate" title={character.name}>
-									{character.name || 'Unknown'}
-								</p>
-								{#if character.personName}
-									<p class="text-xs text-gray-600 truncate" title={character.personName}>
-										{character.personName}
-									</p>
-								{/if}
-							</a>
-						{/each}
-					{:else if activeTab === 'directors'}
-						{#each directors as character}
-							<a
-								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
-								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
-							>
-								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
-									<img
-										src={getCharacterImage(character)}
-										alt={character.personName}
-										class="w-full h-full object-cover"
-										on:error={(e) => {
-											e.currentTarget.src = PLACEHOLDER_PERSON;
-										}}
-									/>
-								</div>
-								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
-									{character.personName || 'Unknown'}
-								</p>
-							</a>
-						{/each}
-					{:else if activeTab === 'writers'}
-						{#each writers as character}
-							<a
-								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
-								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
-							>
-								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
-									<img
-										src={getCharacterImage(character)}
-										alt={character.personName}
-										class="w-full h-full object-cover"
-										on:error={(e) => {
-											e.currentTarget.src = PLACEHOLDER_PERSON;
-										}}
-									/>
-								</div>
-								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
-									{character.personName || 'Unknown'}
-								</p>
-							</a>
-						{/each}
-					{:else if activeTab === 'producers'}
-						{#each producers as character}
-							<a
-								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
-								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
-							>
-								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
-									<img
-										src={getCharacterImage(character)}
-										alt={character.personName}
-										class="w-full h-full object-cover"
-										on:error={(e) => {
-											e.currentTarget.src = PLACEHOLDER_PERSON;
-										}}
-									/>
-								</div>
-								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
-									{character.personName || 'Unknown'}
-								</p>
-								<p class="text-xs text-gray-500">{character.peopleType}</p>
-							</a>
-						{/each}
-					{:else if activeTab === 'other'}
-						{#each otherCrew as character}
-							<a
-								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
-								class="text-center block hover:opacity-75 transition-opacity {character.peopleId ? 'cursor-pointer' : 'cursor-default'}"
-							>
-								<div class="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
-									<img
-										src={getCharacterImage(character)}
-										alt={character.personName}
-										class="w-full h-full object-cover"
-										on:error={(e) => {
-											e.currentTarget.src = PLACEHOLDER_PERSON;
-										}}
-									/>
-								</div>
-								<p class="font-semibold text-sm text-gray-900 truncate" title={character.personName}>
-									{character.personName || 'Unknown'}
-								</p>
-								{#if character.peopleType}
-									<p class="text-xs text-gray-500">{character.peopleType}</p>
-								{/if}
-							</a>
-						{/each}
-					{/if}
-					</div>
 				{/if}
 			</div>
 		{/if}
