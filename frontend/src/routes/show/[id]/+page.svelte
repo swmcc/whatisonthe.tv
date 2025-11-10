@@ -233,9 +233,9 @@
 			</div>
 		</div>
 
-		<!-- Cast & Crew -->
-		{#if data.characters && data.characters.length > 0}
-			{@const sortedCharacters = [...data.characters].sort((a, b) => (a.sort || 999) - (b.sort || 999))}
+		<!-- Cast & Crew and Seasons -->
+		{#if (data.characters && data.characters.length > 0) || (isSeries && seasons.length > 0)}
+			{@const sortedCharacters = data.characters ? [...data.characters].sort((a, b) => (a.sort || 999) - (b.sort || 999)) : []}
 			{@const actors = sortedCharacters.filter(c => c.peopleType === 'Actor')}
 			{@const directors = sortedCharacters.filter(c => c.peopleType === 'Director')}
 			{@const writers = sortedCharacters.filter(c => c.peopleType === 'Writer')}
@@ -243,7 +243,7 @@
 			{@const otherCrew = sortedCharacters.filter(c => c.peopleType !== 'Actor' && c.peopleType !== 'Director' && c.peopleType !== 'Writer' && c.peopleType !== 'Executive Producer' && c.peopleType !== 'Producer')}
 
 			<div class="bg-white rounded-lg shadow-lg p-6">
-				<h2 class="text-2xl font-bold text-gray-900 mb-6">Cast & Crew</h2>
+				<h2 class="text-2xl font-bold text-gray-900 mb-6">{isSeries && seasons.length > 0 ? 'Cast, Crew & Episodes' : 'Cast & Crew'}</h2>
 
 				<!-- Tabs -->
 				<div class="border-b border-gray-200 mb-6">
@@ -293,12 +293,114 @@
 								Other ({otherCrew.length})
 							</button>
 						{/if}
+						{#if isSeries && seasons.length > 0}
+							<button
+								on:click={() => activeTab = 'seasons'}
+								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
+									{activeTab === 'seasons' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+							>
+								Seasons ({seasons.length})
+							</button>
+						{/if}
 					</nav>
 				</div>
 
 				<!-- Tab Content -->
-				<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
-					{#if activeTab === 'actors'}
+				{#if activeTab === 'seasons'}
+					<!-- Seasons Tab -->
+					{#if loadingSeasons}
+						<div class="flex items-center justify-center py-8">
+							<svg class="animate-spin h-8 w-8 text-indigo-600" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+						</div>
+					{:else}
+						<div class="space-y-4">
+							{#each seasons as season}
+								<div class="border border-gray-200 rounded-lg overflow-hidden">
+									<!-- Season Header -->
+									<button
+										on:click={() => toggleSeason(season.season_number)}
+										class="w-full px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+									>
+										<div class="flex items-center gap-4">
+											<div>
+												<h3 class="text-lg font-semibold text-gray-900">
+													Season {season.season_number}
+													{#if season.name && season.name !== `Season ${season.season_number}`}
+														<span class="text-gray-600">- {season.name}</span>
+													{/if}
+												</h3>
+												{#if season.episodes}
+													<p class="text-sm text-gray-600">{season.episodes.length} Episodes</p>
+												{/if}
+											</div>
+										</div>
+										<svg
+											class="w-5 h-5 text-gray-500 transition-transform {expandedSeasons.has(season.season_number) ? 'rotate-180' : ''}"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+										</svg>
+									</button>
+
+									<!-- Episodes List (Expanded) -->
+									{#if expandedSeasons.has(season.season_number) && season.episodes}
+										<div class="px-6 py-4 bg-white">
+											<div class="space-y-3">
+												{#each season.episodes as episode}
+													<div class="flex gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+														<!-- Episode Image -->
+														{#if episode.image || episode.image_url}
+															<div class="flex-shrink-0 w-32 h-20 bg-gray-200 rounded overflow-hidden">
+																<img
+																	src={episode.image || episode.image_url}
+																	alt={episode.name || `Episode ${episode.episode_number}`}
+																	class="w-full h-full object-cover"
+																	on:error={(e) => {
+																		e.currentTarget.style.display = 'none';
+																	}}
+																/>
+															</div>
+														{/if}
+
+														<!-- Episode Info -->
+														<div class="flex-1 min-w-0">
+															<div class="flex items-start justify-between gap-2">
+																<div class="flex-1">
+																	<h4 class="font-semibold text-gray-900">
+																		{episode.episode_number}. {episode.name || 'TBA'}
+																	</h4>
+																	{#if episode.aired}
+																		<p class="text-sm text-gray-500 mt-1">
+																			Aired: {new Date(episode.aired).toLocaleDateString()}
+																		</p>
+																	{/if}
+																</div>
+																{#if episode.runtime}
+																	<span class="text-sm text-gray-500 whitespace-nowrap">{episode.runtime} min</span>
+																{/if}
+															</div>
+															{#if episode.overview}
+																<p class="text-sm text-gray-600 mt-2 line-clamp-2">{episode.overview}</p>
+															{/if}
+														</div>
+													</div>
+												{/each}
+											</div>
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
+				{:else}
+					<!-- Cast & Crew Tabs -->
+					<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
+						{#if activeTab === 'actors'}
 						{#each actors as character}
 							<a
 								href={character.peopleId ? `/person/${character.peopleId}` : '#'}
@@ -413,102 +515,6 @@
 							</a>
 						{/each}
 					{/if}
-				</div>
-			</div>
-		{/if}
-
-		<!-- Seasons & Episodes (Series Only) -->
-		{#if isSeries && seasons.length > 0}
-			<div class="bg-white rounded-lg shadow-lg p-6 mt-8">
-				<h2 class="text-2xl font-bold text-gray-900 mb-6">Seasons & Episodes</h2>
-
-				{#if loadingSeasons}
-					<div class="flex items-center justify-center py-8">
-						<svg class="animate-spin h-8 w-8 text-indigo-600" viewBox="0 0 24 24">
-							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-						</svg>
-					</div>
-				{:else}
-					<div class="space-y-4">
-						{#each seasons as season}
-							<div class="border border-gray-200 rounded-lg overflow-hidden">
-								<!-- Season Header -->
-								<button
-									on:click={() => toggleSeason(season.season_number)}
-									class="w-full px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
-								>
-									<div class="flex items-center gap-4">
-										<div>
-											<h3 class="text-lg font-semibold text-gray-900">
-												Season {season.season_number}
-												{#if season.name && season.name !== `Season ${season.season_number}`}
-													<span class="text-gray-600">- {season.name}</span>
-												{/if}
-											</h3>
-											{#if season.episodes}
-												<p class="text-sm text-gray-600">{season.episodes.length} Episodes</p>
-											{/if}
-										</div>
-									</div>
-									<svg
-										class="w-5 h-5 text-gray-500 transition-transform {expandedSeasons.has(season.season_number) ? 'rotate-180' : ''}"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-									>
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-									</svg>
-								</button>
-
-								<!-- Episodes List (Expanded) -->
-								{#if expandedSeasons.has(season.season_number) && season.episodes}
-									<div class="px-6 py-4 bg-white">
-										<div class="space-y-3">
-											{#each season.episodes as episode}
-												<div class="flex gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-													<!-- Episode Image -->
-													{#if episode.image || episode.image_url}
-														<div class="flex-shrink-0 w-32 h-20 bg-gray-200 rounded overflow-hidden">
-															<img
-																src={episode.image || episode.image_url}
-																alt={episode.name || `Episode ${episode.episode_number}`}
-																class="w-full h-full object-cover"
-																on:error={(e) => {
-																	e.currentTarget.style.display = 'none';
-																}}
-															/>
-														</div>
-													{/if}
-
-													<!-- Episode Info -->
-													<div class="flex-1 min-w-0">
-														<div class="flex items-start justify-between gap-2">
-															<div class="flex-1">
-																<h4 class="font-semibold text-gray-900">
-																	{episode.episode_number}. {episode.name || 'TBA'}
-																</h4>
-																{#if episode.aired}
-																	<p class="text-sm text-gray-500 mt-1">
-																		Aired: {new Date(episode.aired).toLocaleDateString()}
-																	</p>
-																{/if}
-															</div>
-															{#if episode.runtime}
-																<span class="text-sm text-gray-500 whitespace-nowrap">{episode.runtime} min</span>
-															{/if}
-														</div>
-														{#if episode.overview}
-															<p class="text-sm text-gray-600 mt-2 line-clamp-2">{episode.overview}</p>
-														{/if}
-													</div>
-												</div>
-											{/each}
-										</div>
-									</div>
-								{/if}
-							</div>
-						{/each}
 					</div>
 				{/if}
 			</div>
