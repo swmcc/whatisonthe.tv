@@ -294,9 +294,16 @@ def _save_credits(db, content: Content, characters_data: list):
 
         if not person:
             person_name = char_data.get("personName", "Unknown")
+            # Parse name into first/last
+            name_parts = person_name.rsplit(" ", 1)
+            first_name = name_parts[0] if name_parts else ""
+            last_name = name_parts[1] if len(name_parts) > 1 else ""
+
             person = Person(
                 tvdb_id=person_id,
                 full_name=person_name,
+                first_name=first_name,
+                last_name=last_name,
                 last_synced_at=None  # Mark as needing sync
             )
             db.add(person)

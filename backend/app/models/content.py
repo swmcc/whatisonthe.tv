@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from app.models.series_detail import SeriesDetail
     from app.models.movie_detail import MovieDetail
     from app.models.alias import Alias
+    from app.models.season import Season
+    from app.models.episode import Episode
 
 
 class Content(Base):
@@ -137,6 +139,22 @@ class Content(Base):
         foreign_keys="[Alias.entity_id]",
         cascade="all, delete-orphan",
         viewonly=True
+    )
+
+    # Seasons (for series only)
+    seasons: Mapped[list["Season"]] = relationship(
+        "Season",
+        back_populates="content",
+        cascade="all, delete-orphan",
+        order_by="Season.season_number"
+    )
+
+    # Episodes (for series only)
+    episodes: Mapped[list["Episode"]] = relationship(
+        "Episode",
+        back_populates="content",
+        cascade="all, delete-orphan",
+        order_by="(Episode.season_number, Episode.episode_number)"
     )
 
     # Indexes

@@ -9,6 +9,8 @@ from app.models.credit import Credit
 from app.models.genre import Genre, content_genre
 from app.models.alias import Alias
 from app.models.sync_log import SyncLog
+from app.models.season import Season
+from app.models.episode import Episode
 
 __all__ = [
     "User",
@@ -21,4 +23,6 @@ __all__ = [
     "content_genre",
     "Alias",
     "SyncLog",
+    "Season",
+    "Episode",
 ]

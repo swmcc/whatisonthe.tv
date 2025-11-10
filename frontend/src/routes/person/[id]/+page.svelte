@@ -288,7 +288,7 @@
 							{@const movie = credit.movie}
 							{#if movie}
 								<a
-									href="/show/{credit.movieId}"
+									href="/show/{credit.movieId}?type=movie"
 									class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer block"
 								>
 									<div class="aspect-[2/3] bg-gray-200 rounded-t-lg overflow-hidden">

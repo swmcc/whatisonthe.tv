@@ -20,8 +20,23 @@
 		loading = true;
 		error = '';
 
+		// Check if URL has a type hint
+		const typeHint = $page.url.searchParams.get('type');
+
 		try {
-			// Try series first
+			if (typeHint === 'movie') {
+				// If explicitly told it's a movie, try movie first
+				try {
+					const response = await api.search.getMovie(parseInt(id));
+					data = response;
+					isSeries = false;
+					return;
+				} catch (movieError) {
+					// Fall through to try series
+				}
+			}
+
+			// Try series first (default behavior)
 			const response = await api.search.getSeries(parseInt(id));
 			data = response;
 			isSeries = true;

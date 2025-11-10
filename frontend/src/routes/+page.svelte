@@ -105,7 +105,7 @@
 		if (type === 'person') {
 			return `/person/${result.id}`;
 		} else if (type === 'movie') {
-			return `/show/${result.id}`; // Using /show for both series and movies for now
+			return `/show/${result.id}?type=movie`;
 		} else {
 			return `/show/${result.id}`; // Default to show for series
 		}
