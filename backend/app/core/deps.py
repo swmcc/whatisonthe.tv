@@ -42,11 +42,12 @@ async def get_current_user(
     if payload is None:
         raise credentials_exception
 
-    # JWT typically stores sub as string, convert to int
+    # JWT sub field (user ID as string)
     user_id_str = payload.get("sub")
     if user_id_str is None:
         raise credentials_exception
 
+    # Convert string user_id to int
     try:
         user_id = int(user_id_str)
     except (ValueError, TypeError):
