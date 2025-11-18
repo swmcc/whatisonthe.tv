@@ -11,6 +11,7 @@ from app.db.database import Base
 if TYPE_CHECKING:
     from app.models.content import Content
     from app.models.season import Season
+    from app.models.checkin import Checkin
 
 
 class Episode(Base):
@@ -66,6 +67,12 @@ class Episode(Base):
     # Relationships
     content: Mapped["Content"] = relationship("Content", back_populates="episodes")
     season: Mapped["Season | None"] = relationship("Season", back_populates="episodes")
+    checkins: Mapped[list["Checkin"]] = relationship(
+        "Checkin",
+        back_populates="episode",
+        cascade="all, delete-orphan",
+        order_by="Checkin.watched_at.desc()"
+    )
 
     __table_args__ = (
         Index('idx_episode_content', 'content_id'),

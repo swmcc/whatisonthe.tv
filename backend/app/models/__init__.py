@@ -11,6 +11,7 @@ from app.models.alias import Alias
 from app.models.sync_log import SyncLog
 from app.models.season import Season
 from app.models.episode import Episode
+from app.models.checkin import Checkin
 
 __all__ = [
     "User",
@@ -25,4 +26,5 @@ __all__ = [
     "SyncLog",
     "Season",
     "Episode",
+    "Checkin",
 ]

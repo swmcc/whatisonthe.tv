@@ -1,11 +1,15 @@
 """User model."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+
+if TYPE_CHECKING:
+    from app.models.checkin import Checkin
 
 
 class User(Base):
@@ -23,6 +27,14 @@ class User(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relationships
+    checkins: Mapped[list["Checkin"]] = relationship(
+        "Checkin",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="Checkin.watched_at.desc()"
     )
 
     def __repr__(self) -> str:

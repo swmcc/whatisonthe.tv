@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from app.models.alias import Alias
     from app.models.season import Season
     from app.models.episode import Episode
+    from app.models.checkin import Checkin
 
 
 class Content(Base):
@@ -155,6 +156,14 @@ class Content(Base):
         back_populates="content",
         cascade="all, delete-orphan",
         order_by="(Episode.season_number, Episode.episode_number)"
+    )
+
+    # Checkins
+    checkins: Mapped[list["Checkin"]] = relationship(
+        "Checkin",
+        back_populates="content",
+        cascade="all, delete-orphan",
+        order_by="Checkin.watched_at.desc()"
     )
 
     # Indexes
