@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 class CheckinBase(BaseModel):
     """Base checkin schema."""
 
-    content_id: int = Field(..., description="ID of the content (movie or series)")
-    episode_id: Optional[int] = Field(None, description="ID of the episode (for TV show check-ins)")
+    content_id: int = Field(..., description="TVDB ID of the content (movie or series)")
+    episode_id: Optional[int] = Field(None, description="TVDB ID of the episode (for TV show check-ins)")
     watched_at: datetime = Field(..., description="Date and time when the content was watched")
     location: Optional[str] = Field(None, max_length=255, description="Where the content was watched")
     watched_with: Optional[str] = Field(None, max_length=255, description="Who the content was watched with")

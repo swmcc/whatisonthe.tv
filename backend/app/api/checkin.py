@@ -26,7 +26,7 @@ async def create_checkin(
     Create a new checkin for the current user.
 
     Args:
-        checkin_data: Checkin creation data
+        checkin_data: Checkin creation data (content_id is TVDB ID)
         current_user: Current authenticated user
         db: Database session
 
@@ -34,41 +34,58 @@ async def create_checkin(
         Created checkin
 
     Raises:
-        HTTPException: If content or episode not found
+        HTTPException: If content or episode cannot be found/created
     """
-    # Verify content exists
+    # Look up content by TVDB ID
     content_result = await db.execute(
-        select(Content).where(Content.id == checkin_data.content_id)
+        select(Content).where(Content.tvdb_id == checkin_data.content_id)
     )
     content = content_result.scalar_one_or_none()
+
+    # If content not in DB, trigger background sync for next time
     if not content:
+        # Queue sync tasks for future check-ins
+        from app.tasks.content import save_movie_full, save_series_full
+
+        # Trigger background save (these run async via Celery)
+        try:
+            save_movie_full.delay(checkin_data.content_id)
+        except:
+            pass
+        try:
+            save_series_full.delay(checkin_data.content_id)
+        except:
+            pass
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Content with id {checkin_data.content_id} not found",
+            detail=f"Content not found in database. Please view the content detail page first, then try checking in again.",
         )
 
     # If episode_id provided, verify it exists and belongs to the content
+    episode = None
     if checkin_data.episode_id:
+        # Look up episode by TVDB ID
         episode_result = await db.execute(
-            select(Episode).where(Episode.id == checkin_data.episode_id)
+            select(Episode).where(Episode.tvdb_id == checkin_data.episode_id)
         )
         episode = episode_result.scalar_one_or_none()
         if not episode:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Episode with id {checkin_data.episode_id} not found",
+                detail=f"Episode with TVDB ID {checkin_data.episode_id} not found. Please ensure the series and its episodes are loaded.",
             )
-        if episode.content_id != checkin_data.content_id:
+        if episode.content_id != content.id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Episode does not belong to the specified content",
             )
 
-    # Create checkin
+    # Create checkin using internal database IDs
     checkin = Checkin(
         user_id=current_user.id,
-        content_id=checkin_data.content_id,
-        episode_id=checkin_data.episode_id,
+        content_id=content.id,  # Use internal DB ID
+        episode_id=episode.id if episode else None,  # Use internal DB ID
         watched_at=checkin_data.watched_at,
         location=checkin_data.location,
         watched_with=checkin_data.watched_with,
