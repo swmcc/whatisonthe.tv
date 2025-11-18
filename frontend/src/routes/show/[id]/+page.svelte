@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import CheckInModal from '$lib/components/CheckInModal.svelte';
 
 	let loading = true;
 	let error = '';
@@ -13,6 +14,18 @@
 	let seasons: any[] = [];
 	let loadingSeasons = false;
 	let expandedSeasons = new Set<number>();
+
+	// Check-in modal state
+	let showCheckInModal = false;
+	let checkInData: {
+		contentId: number;
+		contentName: string;
+		contentType: 'series' | 'movie';
+		episodeId: number | null;
+		episodeName: string | null;
+		seasonNumber: number | null;
+		episodeNumber: number | null;
+	} | null = null;
 
 	const id = $page.params.id;
 
@@ -97,6 +110,31 @@
 			expandedSeasons.add(seasonNumber);
 		}
 		expandedSeasons = expandedSeasons;
+	}
+
+	function openCheckInModal(episode: any = null, season: any = null) {
+		if (!data) return;
+
+		checkInData = {
+			contentId: data.id,
+			contentName: data.name || data.title,
+			contentType: isSeries ? 'series' : 'movie',
+			episodeId: episode?.id || null,
+			episodeName: episode?.name || null,
+			seasonNumber: episode?.season_number || season?.season_number || null,
+			episodeNumber: episode?.episode_number || null
+		};
+		showCheckInModal = true;
+	}
+
+	function closeCheckInModal() {
+		showCheckInModal = false;
+		checkInData = null;
+	}
+
+	function handleCheckInSuccess() {
+		// Could reload check-in data here if we want to show check-in history
+		console.log('Check-in successful!');
 	}
 
 	const PLACEHOLDER_POSTER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="500" height="750"%3E%3Crect fill="%23e5e7eb" width="500" height="750"/%3E%3Ctext fill="%236b7280" font-family="Arial" font-size="24" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3ENo Poster%3C/text%3E%3C/svg%3E';
@@ -239,6 +277,19 @@
 							</div>
 						</div>
 					{/if}
+
+					<!-- Check-in Button -->
+					<div class="mt-6">
+						<button
+							on:click={() => openCheckInModal()}
+							class="w-full px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+						>
+							<svg class="w-5 h-5 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+							</svg>
+							Check In {isSeries ? 'Show' : 'Movie'}
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -535,6 +586,19 @@
 																<p class="text-sm text-gray-600 mt-2 line-clamp-2">{episode.overview}</p>
 															{/if}
 														</div>
+
+														<!-- Check-in Button -->
+														<div class="flex-shrink-0">
+															<button
+																on:click={() => openCheckInModal(episode, season)}
+																class="px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+																title="Check in this episode"
+															>
+																<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+																</svg>
+															</button>
+														</div>
 													</div>
 												{/each}
 											</div>
@@ -548,4 +612,19 @@
 			</div>
 		{/if}
 	</div>
+{/if}
+
+<!-- Check-in Modal -->
+{#if showCheckInModal && checkInData}
+	<CheckInModal
+		contentId={checkInData.contentId}
+		contentName={checkInData.contentName}
+		contentType={checkInData.contentType}
+		episodeId={checkInData.episodeId}
+		episodeName={checkInData.episodeName}
+		seasonNumber={checkInData.seasonNumber}
+		episodeNumber={checkInData.episodeNumber}
+		on:close={closeCheckInModal}
+		on:success={handleCheckInSuccess}
+	/>
 {/if}

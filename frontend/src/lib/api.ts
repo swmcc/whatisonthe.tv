@@ -105,5 +105,57 @@ export const api = {
 				requiresAuth: true
 			});
 		}
+	},
+	checkin: {
+		create: async (data: {
+			content_id: number;
+			episode_id?: number;
+			watched_at: string;
+			location?: string;
+			watched_with?: string;
+			notes?: string;
+		}) => {
+			return request('/checkins', {
+				method: 'POST',
+				body: JSON.stringify(data),
+				requiresAuth: true
+			});
+		},
+		list: async (limit: number = 50, offset: number = 0) => {
+			return request(`/checkins?limit=${limit}&offset=${offset}`, {
+				requiresAuth: true
+			});
+		},
+		get: async (id: number) => {
+			return request(`/checkins/${id}`, {
+				requiresAuth: true
+			});
+		},
+		update: async (
+			id: number,
+			data: {
+				watched_at?: string;
+				location?: string;
+				watched_with?: string;
+				notes?: string;
+			}
+		) => {
+			return request(`/checkins/${id}`, {
+				method: 'PATCH',
+				body: JSON.stringify(data),
+				requiresAuth: true
+			});
+		},
+		delete: async (id: number) => {
+			return request(`/checkins/${id}`, {
+				method: 'DELETE',
+				requiresAuth: true
+			});
+		},
+		listByContent: async (contentId: number) => {
+			return request(`/checkins/content/${contentId}`, {
+				requiresAuth: true
+			});
+		}
 	}
 };

@@ -55,6 +55,14 @@
 								Search
 							</a>
 							<a
+								href="/checkins"
+								class="border-transparent text-gray-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium hover:border-indigo-500 transition-colors"
+								class:border-indigo-500={$page.url.pathname === '/checkins'}
+								class:text-indigo-600={$page.url.pathname === '/checkins'}
+							>
+								Check-ins
+							</a>
+							<a
 								href="/settings"
 								class="border-transparent text-gray-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium hover:border-indigo-500 transition-colors"
 								class:border-indigo-500={$page.url.pathname === '/settings'}
@@ -131,6 +139,17 @@
 							class:text-gray-600={$page.url.pathname !== '/'}
 						>
 							Search
+						</a>
+						<a
+							href="/checkins"
+							class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+							class:border-indigo-500={$page.url.pathname === '/checkins'}
+							class:bg-indigo-50={$page.url.pathname === '/checkins'}
+							class:text-indigo-700={$page.url.pathname === '/checkins'}
+							class:border-transparent={$page.url.pathname !== '/checkins'}
+							class:text-gray-600={$page.url.pathname !== '/checkins'}
+						>
+							Check-ins
 						</a>
 						<a
 							href="/settings"
