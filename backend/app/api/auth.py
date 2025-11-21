@@ -91,6 +91,8 @@ async def update_current_user(
         Updated user data
     """
     # Update only provided fields
+    if user_update.username is not None:
+        current_user.username = user_update.username
     if user_update.first_name is not None:
         current_user.first_name = user_update.first_name
     if user_update.last_name is not None:
