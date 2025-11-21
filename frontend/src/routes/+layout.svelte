@@ -131,6 +131,11 @@
 											<p class="text-sm font-medium text-gray-900">
 												{$auth.user.first_name} {$auth.user.last_name}
 											</p>
+											{#if $auth.user.username}
+												<p class="text-xs text-indigo-600 font-medium">
+													@{$auth.user.username}
+												</p>
+											{/if}
 											<p class="text-xs text-gray-500 truncate">
 												{$auth.user.email}
 											</p>
@@ -213,6 +218,11 @@
 								<div class="text-base font-medium text-gray-800">
 									{$auth.user.first_name} {$auth.user.last_name}
 								</div>
+								{#if $auth.user.username}
+									<div class="text-xs font-medium text-indigo-600">
+										@{$auth.user.username}
+									</div>
+								{/if}
 								<div class="text-sm font-medium text-gray-500">
 									{$auth.user.email}
 								</div>
