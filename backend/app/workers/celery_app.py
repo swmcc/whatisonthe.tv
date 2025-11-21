@@ -13,10 +13,12 @@ redis_backend_use_ssl = None
 if settings.redis_url.startswith("rediss://"):
     # Heroku Redis uses TLS, configure SSL settings
     broker_use_ssl = {
-        'ssl_cert_reqs': ssl.CERT_NONE  # Required for Heroku Redis
+        'ssl_cert_reqs': ssl.CERT_NONE,
+        'ssl_check_hostname': False,
     }
     redis_backend_use_ssl = {
-        'ssl_cert_reqs': ssl.CERT_NONE
+        'ssl_cert_reqs': ssl.CERT_NONE,
+        'ssl_check_hostname': False,
     }
 
 # Create Celery app
@@ -48,12 +50,10 @@ celery_app.conf.update(
     # SSL settings for Redis (Heroku)
     broker_use_ssl=broker_use_ssl,
     redis_backend_use_ssl=redis_backend_use_ssl,
+    broker_connection_retry_on_startup=True,
 
     # Result backend settings
     result_expires=3600,  # Results expire after 1 hour
-    result_backend_transport_options={
-        "master_name": "mymaster",
-    },
 
     # Worker settings
     worker_prefetch_multiplier=4,
