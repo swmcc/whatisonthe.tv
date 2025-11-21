@@ -1,9 +1,23 @@
 """Celery application configuration."""
 
+import ssl
 from celery import Celery
 from celery.schedules import crontab
 
 from app.core.config import settings
+
+# Configure SSL for Redis if using rediss:// (Heroku)
+broker_use_ssl = None
+redis_backend_use_ssl = None
+
+if settings.redis_url.startswith("rediss://"):
+    # Heroku Redis uses TLS, configure SSL settings
+    broker_use_ssl = {
+        'ssl_cert_reqs': ssl.CERT_NONE  # Required for Heroku Redis
+    }
+    redis_backend_use_ssl = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
 
 # Create Celery app
 celery_app = Celery(
@@ -30,6 +44,10 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=30 * 60,  # 30 minutes max
     task_soft_time_limit=25 * 60,  # 25 minutes soft limit
+
+    # SSL settings for Redis (Heroku)
+    broker_use_ssl=broker_use_ssl,
+    redis_backend_use_ssl=redis_backend_use_ssl,
 
     # Result backend settings
     result_expires=3600,  # Results expire after 1 hour
