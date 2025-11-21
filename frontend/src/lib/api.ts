@@ -1,7 +1,8 @@
 import { auth } from './stores/auth';
 import { get } from 'svelte/store';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Use relative URLs in production (empty string), localhost in development
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '' : 'http://localhost:8000');
 
 interface RequestOptions extends RequestInit {
 	requiresAuth?: boolean;
