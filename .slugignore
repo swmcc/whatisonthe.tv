@@ -1,9 +1,11 @@
 # Exclude from Heroku slug to reduce size
 frontend/node_modules/
 frontend/src/
-frontend/.svelte-kit/
+frontend/.svelte-kit/dev/
 frontend/static/
+!frontend/build/
 *.md
+!HEROKU_DEPLOYMENT.md
 .git/
 .github/
 tests/
