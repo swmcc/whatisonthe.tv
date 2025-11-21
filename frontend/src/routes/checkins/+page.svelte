@@ -123,7 +123,7 @@
 							class="flex-shrink-0"
 						>
 							<img
-								src={checkin.content.poster_url || PLACEHOLDER_POSTER}
+								src={checkin.content.image_url || checkin.content.poster_url || PLACEHOLDER_POSTER}
 								alt={checkin.content.name}
 								class="w-24 h-36 object-cover rounded"
 								on:error={(e) => {

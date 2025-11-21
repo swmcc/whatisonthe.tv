@@ -40,6 +40,7 @@ class ContentSummary(BaseModel):
     content_type: str
     year: Optional[int] = None
     poster_url: Optional[str] = None
+    image_url: Optional[str] = None  # Primary image field
 
     model_config = {"from_attributes": True}
 
