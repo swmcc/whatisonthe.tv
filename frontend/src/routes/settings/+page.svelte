@@ -21,11 +21,15 @@
 	// Tab management
 	let activeTab: 'profile' | 'security' = 'profile';
 
-	$: if ($auth.user) {
-		user = $auth.user;
-		firstName = user.first_name || '';
-		lastName = user.last_name || '';
-	}
+	// Initialize user data on mount
+	onMount(() => {
+		const currentUser = $auth.user;
+		if (currentUser) {
+			user = currentUser;
+			firstName = currentUser.first_name || '';
+			lastName = currentUser.last_name || '';
+		}
+	});
 
 	async function handleProfileUpdate() {
 		profileError = '';
