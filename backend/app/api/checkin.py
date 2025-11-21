@@ -1,5 +1,7 @@
 """Checkin API endpoints."""
 
+import asyncio
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,9 +13,115 @@ from app.models.checkin import Checkin
 from app.models.content import Content
 from app.models.episode import Episode
 from app.models.user import User
+from app.models.series_detail import SeriesDetail
+from app.models.movie_detail import MovieDetail
 from app.schemas.checkin import CheckinCreate, CheckinResponse, CheckinUpdate
+from app.services.content_repository import ContentRepository
 
 router = APIRouter(prefix="/checkins", tags=["checkins"])
+
+
+async def _get_content_with_retry(
+    db: AsyncSession, tvdb_id: int, max_retries: int = 3, delay: float = 0.5
+) -> Content | None:
+    """
+    Get content from DB with retry logic (for background save completion).
+
+    Args:
+        db: Database session
+        tvdb_id: TVDB ID of content
+        max_retries: Maximum number of retry attempts
+        delay: Delay between retries in seconds
+
+    Returns:
+        Content object or None
+    """
+    for attempt in range(max_retries):
+        result = await db.execute(
+            select(Content).where(Content.tvdb_id == tvdb_id)
+        )
+        content = result.scalar_one_or_none()
+        if content:
+            return content
+        if attempt < max_retries - 1:
+            await asyncio.sleep(delay)
+    return None
+
+
+async def _create_basic_movie(db: AsyncSession, tvdb_id: int, api_data: dict) -> Content:
+    """Create basic movie content record (minimal data for immediate check-in)."""
+    # Convert year to int if it's a string
+    year = api_data.get("year")
+    if year and isinstance(year, str):
+        try:
+            year = int(year)
+        except (ValueError, TypeError):
+            year = None
+
+    content = Content(
+        tvdb_id=tvdb_id,
+        content_type="movie",
+        name=api_data.get("name"),
+        overview=api_data.get("overview"),
+        year=year,
+        status=api_data.get("status", {}).get("name") if isinstance(api_data.get("status"), dict) else api_data.get("status"),
+        image_url=api_data.get("image"),
+        original_language=api_data.get("originalLanguage"),
+        original_country=api_data.get("originalCountry"),
+        last_synced_at=datetime.utcnow(),
+        extra_metadata=api_data
+    )
+    db.add(content)
+    await db.flush()
+
+    # Add movie details
+    movie_detail = MovieDetail(
+        content_id=content.id,
+        runtime=api_data.get("runtime"),
+    )
+    db.add(movie_detail)
+    await db.flush()
+
+    return content
+
+
+async def _create_basic_series(db: AsyncSession, tvdb_id: int, api_data: dict) -> Content:
+    """Create basic series content record (minimal data for immediate check-in)."""
+    # Convert year to int if it's a string
+    year = api_data.get("year")
+    if year and isinstance(year, str):
+        try:
+            year = int(year)
+        except (ValueError, TypeError):
+            year = None
+
+    content = Content(
+        tvdb_id=tvdb_id,
+        content_type="series",
+        name=api_data.get("name"),
+        overview=api_data.get("overview"),
+        year=year,
+        status=api_data.get("status", {}).get("name") if isinstance(api_data.get("status"), dict) else api_data.get("status"),
+        image_url=api_data.get("image"),
+        original_language=api_data.get("originalLanguage"),
+        original_country=api_data.get("originalCountry"),
+        last_synced_at=datetime.utcnow(),
+        extra_metadata=api_data
+    )
+    db.add(content)
+    await db.flush()
+
+    # Add series details
+    series_detail = SeriesDetail(
+        content_id=content.id,
+        number_of_seasons=api_data.get("numberOfSeasons"),
+        number_of_episodes=api_data.get("numberOfEpisodes"),
+        average_runtime=api_data.get("averageRuntime"),
+    )
+    db.add(series_detail)
+    await db.flush()
+
+    return content
 
 
 @router.post("", response_model=CheckinResponse, status_code=status.HTTP_201_CREATED)
@@ -24,6 +132,9 @@ async def create_checkin(
 ):
     """
     Create a new checkin for the current user.
+
+    This endpoint uses the same DB-first + API fallback pattern as the detail views.
+    If content isn't in the database yet, it will be fetched and saved automatically.
 
     Args:
         checkin_data: Checkin creation data (content_id is TVDB ID)
@@ -36,31 +147,50 @@ async def create_checkin(
     Raises:
         HTTPException: If content or episode cannot be found/created
     """
-    # Look up content by TVDB ID
-    content_result = await db.execute(
-        select(Content).where(Content.tvdb_id == checkin_data.content_id)
-    )
-    content = content_result.scalar_one_or_none()
+    # Quick check if content already exists in DB
+    content = await _get_content_with_retry(db, checkin_data.content_id, max_retries=1, delay=0)
 
-    # If content not in DB, trigger background sync for next time
+    # If not in DB, fetch and save basic content record immediately
     if not content:
-        # Queue sync tasks for future check-ins
+        from app.services.tvdb import tvdb_service
         from app.tasks.content import save_movie_full, save_series_full
 
-        # Trigger background save (these run async via Celery)
-        try:
-            save_movie_full.delay(checkin_data.content_id)
-        except:
-            pass
-        try:
-            save_series_full.delay(checkin_data.content_id)
-        except:
-            pass
+        # Fetch from TVDB API
+        api_data = tvdb_service.get_movie_details(checkin_data.content_id)
+        is_movie = True
 
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Content not found in database. Please view the content detail page first, then try checking in again.",
-        )
+        if not api_data:
+            api_data = tvdb_service.get_series_details(checkin_data.content_id)
+            is_movie = False
+
+        if not api_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Content with TVDB ID {checkin_data.content_id} not found on TVDB",
+            )
+
+        # Create basic content record immediately (just enough for check-in)
+        try:
+            if is_movie:
+                content = await _create_basic_movie(db, checkin_data.content_id, api_data)
+            else:
+                content = await _create_basic_series(db, checkin_data.content_id, api_data)
+
+            await db.commit()
+            await db.refresh(content)
+
+            # Queue background task for full sync (genres, credits, seasons/episodes)
+            if is_movie:
+                save_movie_full.delay(checkin_data.content_id, api_data)
+            else:
+                save_series_full.delay(checkin_data.content_id, api_data)
+
+        except Exception as e:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to save content: {str(e)}",
+            )
 
     # If episode_id provided, verify it exists and belongs to the content
     episode = None
