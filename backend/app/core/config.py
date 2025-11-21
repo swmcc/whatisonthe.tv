@@ -42,8 +42,8 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
 
         # Heroku provides DATABASE_URL for Postgres
-        if os.getenv("DATABASE_URL"):
-            db_url = os.getenv("DATABASE_URL")
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
             # Heroku uses postgres://, SQLAlchemy 1.4+ requires postgresql://
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -53,12 +53,14 @@ class Settings(BaseSettings):
             self.database_url = db_url
 
         # Heroku provides REDIS_URL for Redis
-        if os.getenv("REDIS_URL"):
-            self.redis_url = os.getenv("REDIS_URL")
+        redis_url = os.getenv("REDIS_URL")
+        if redis_url:
+            self.redis_url = redis_url
 
         # Parse CORS origins from comma-separated string (for Heroku config)
-        if os.getenv("CORS_ORIGINS"):
-            self.cors_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS").split(",")]
+        cors_env = os.getenv("CORS_ORIGINS")
+        if cors_env and cors_env.strip():
+            self.cors_origins = [origin.strip() for origin in cors_env.split(",")]
 
 
 settings = Settings()
