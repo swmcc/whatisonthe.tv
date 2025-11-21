@@ -150,3 +150,33 @@ async def logout(current_user: User = Depends(get_current_user)):
         Success message
     """
     return {"message": "Logged out successfully"}
+
+
+@router.get("/user/{username}", response_model=UserResponse)
+async def get_public_user(
+    username: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get public user information by username (no authentication required).
+
+    Args:
+        username: Username of the user
+        db: Database session
+
+    Returns:
+        Public user data (excludes email for privacy)
+
+    Raises:
+        HTTPException: If user not found
+    """
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with username '{username}' not found",
+        )
+
+    return UserResponse.model_validate(user)

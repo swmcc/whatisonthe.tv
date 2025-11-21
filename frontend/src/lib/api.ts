@@ -55,6 +55,11 @@ export const api = {
 				requiresAuth: true
 			});
 		},
+		getPublicUser: async (username: string) => {
+			return request(`/auth/user/${username}`, {
+				requiresAuth: false
+			});
+		},
 		updateProfile: async (data: { username?: string | null; first_name?: string; last_name?: string }) => {
 			return request('/auth/me', {
 				method: 'PATCH',

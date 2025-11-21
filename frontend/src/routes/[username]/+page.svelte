@@ -5,6 +5,7 @@
 	import { api } from '$lib/api';
 
 	let username = '';
+	let userInfo: any = null;
 	let checkins: any[] = [];
 	let loading = true;
 	let loadingMore = false;
@@ -46,6 +47,11 @@
 	}
 
 	onMount(async () => {
+		try {
+			userInfo = await api.auth.getPublicUser(username);
+		} catch (err) {
+			console.error('Failed to load user info:', err);
+		}
 		await loadCheckins();
 		setupInfiniteScroll();
 	});
@@ -153,12 +159,52 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-	<!-- Simple Header -->
+	<!-- Header -->
 	<nav class="bg-white shadow-sm">
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 			<div class="flex justify-between h-16">
-				<div class="flex items-center">
-					<h1 class="text-2xl font-bold text-gray-900">@{username}'s Check-ins</h1>
+				<div class="flex items-center gap-4">
+					<!-- Retro TV Logo -->
+					<svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+						<!-- Antenna -->
+						<line x1="35" y1="15" x2="25" y2="5" stroke="#8B4513" stroke-width="2" stroke-linecap="round"/>
+						<line x1="65" y1="15" x2="75" y2="5" stroke="#8B4513" stroke-width="2" stroke-linecap="round"/>
+						<circle cx="25" cy="5" r="2" fill="#8B4513"/>
+						<circle cx="75" cy="5" r="2" fill="#8B4513"/>
+
+						<!-- TV Body -->
+						<rect x="15" y="20" width="70" height="60" rx="8" fill="#8B4513"/>
+						<rect x="18" y="23" width="64" height="54" rx="6" fill="#A0522D"/>
+
+						<!-- Screen -->
+						<rect x="23" y="28" width="54" height="38" rx="3" fill="#2D4F67"/>
+						<rect x="25" y="30" width="50" height="34" rx="2" fill="#4A90B5" opacity="0.6"/>
+
+						<!-- Control Panel -->
+						<circle cx="72" cy="72" r="3" fill="#654321"/>
+						<circle cx="65" cy="72" r="2.5" fill="#654321"/>
+						<circle cx="58" cy="72" r="2" fill="#654321"/>
+
+						<!-- Speaker grille -->
+						<line x1="28" y1="72" x2="48" y2="72" stroke="#654321" stroke-width="1"/>
+						<line x1="28" y1="75" x2="48" y2="75" stroke="#654321" stroke-width="1"/>
+
+						<!-- TV Legs -->
+						<rect x="28" y="80" width="8" height="10" rx="2" fill="#8B4513"/>
+						<rect x="64" y="80" width="8" height="10" rx="2" fill="#8B4513"/>
+					</svg>
+
+					<div>
+						{#if userInfo}
+							<h1 class="text-2xl font-bold text-gray-900">
+								{userInfo.first_name} {userInfo.last_name}
+							</h1>
+							<p class="text-sm text-indigo-600 font-medium">@{username}</p>
+						{:else}
+							<h1 class="text-2xl font-bold text-gray-900">@{username}</h1>
+							<p class="text-sm text-gray-500">Public watch history</p>
+						{/if}
+					</div>
 				</div>
 				<div class="flex items-center">
 					<a
