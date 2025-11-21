@@ -119,7 +119,7 @@
 					<div class="flex gap-4 p-4">
 						<!-- Poster -->
 						<a
-							href={`/show/${checkin.content.id}?type=${checkin.content.content_type}`}
+							href={`/show/${checkin.content.tvdb_id}?type=${checkin.content.content_type}`}
 							class="flex-shrink-0"
 						>
 							<img
@@ -137,7 +137,7 @@
 							<div class="flex items-start justify-between">
 								<div class="flex-1">
 									<a
-										href={`/show/${checkin.content.id}?type=${checkin.content.content_type}`}
+										href={`/show/${checkin.content.tvdb_id}?type=${checkin.content.content_type}`}
 										class="text-xl font-bold text-gray-900 hover:text-indigo-600 transition-colors"
 									>
 										{checkin.content.name}

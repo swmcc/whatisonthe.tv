@@ -36,6 +36,7 @@ class ContentSummary(BaseModel):
     """Summary of content for checkin response."""
 
     id: int
+    tvdb_id: int
     name: str
     content_type: str
     year: Optional[int] = None
