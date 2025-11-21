@@ -5,10 +5,17 @@
 
 	let checkins: any[] = [];
 	let loading = true;
+	let loadingMore = false;
 	let error = '';
+	let hasMore = true;
+	let oldestDate: string | null = null;
+
+	// Group checkins by day
+	$: groupedCheckins = groupByDay(checkins);
 
 	onMount(async () => {
 		await loadCheckins();
+		setupInfiniteScroll();
 	});
 
 	async function loadCheckins() {
@@ -16,13 +23,74 @@
 		error = '';
 
 		try {
-			const response = await api.checkin.list(100, 0);
+			const response = await api.checkin.list(10); // Load last 10 days
 			checkins = response;
+
+			if (response.length > 0) {
+				oldestDate = response[response.length - 1].watched_at;
+			} else {
+				hasMore = false;
+			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load check-ins';
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function loadMoreCheckins() {
+		if (loadingMore || !hasMore || !oldestDate) return;
+
+		loadingMore = true;
+		try {
+			const response = await api.checkin.list(3, oldestDate); // Load next 3 days
+
+			if (response.length === 0) {
+				hasMore = false;
+			} else {
+				checkins = [...checkins, ...response];
+				oldestDate = response[response.length - 1].watched_at;
+			}
+		} catch (err) {
+			console.error('Failed to load more check-ins:', err);
+		} finally {
+			loadingMore = false;
+		}
+	}
+
+	function setupInfiniteScroll() {
+		const handleScroll = () => {
+			const scrollTop = window.scrollY || document.documentElement.scrollTop;
+			const scrollHeight = document.documentElement.scrollHeight;
+			const clientHeight = document.documentElement.clientHeight;
+
+			if (scrollHeight - scrollTop - clientHeight < 500 && hasMore && !loadingMore) {
+				loadMoreCheckins();
+			}
+		};
+
+		window.addEventListener('scroll', handleScroll);
+		return () => window.removeEventListener('scroll', handleScroll);
+	}
+
+	function groupByDay(checkinList: any[]): Map<string, any[]> {
+		const groups = new Map<string, any[]>();
+
+		for (const checkin of checkinList) {
+			const date = new Date(checkin.watched_at);
+			const dayKey = date.toLocaleDateString('en-US', {
+				year: 'numeric',
+				month: 'long',
+				day: 'numeric'
+			});
+
+			if (!groups.has(dayKey)) {
+				groups.set(dayKey, []);
+			}
+			groups.get(dayKey)!.push(checkin);
+		}
+
+		return groups;
 	}
 
 	async function deleteCheckin(id: number) {
@@ -113,8 +181,17 @@
 			</p>
 		</div>
 	{:else}
-		<div class="space-y-4">
-			{#each checkins as checkin}
+		<div class="space-y-8">
+			{#each Array.from(groupedCheckins.entries()) as [day, dayCheckins]}
+				<!-- Day Header -->
+				<div>
+					<h2 class="text-lg font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">
+						{day}
+					</h2>
+
+					<!-- Checkins for this day -->
+					<div class="space-y-4">
+						{#each dayCheckins as checkin}
 				<div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
 					<div class="flex gap-4 p-4">
 						<!-- Poster -->
@@ -228,8 +305,44 @@
 							</div>
 						</div>
 					</div>
+						</div>
+					{/each}
+					</div>
 				</div>
 			{/each}
+
+			<!-- Loading More Indicator -->
+			{#if loadingMore}
+				<div class="flex justify-center items-center py-8">
+					<svg
+						class="animate-spin h-8 w-8 text-indigo-600"
+						xmlns="http://www.w3.org/2000/svg"
+						fill="none"
+						viewBox="0 0 24 24"
+					>
+						<circle
+							class="opacity-25"
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							stroke-width="4"
+						/>
+						<path
+							class="opacity-75"
+							fill="currentColor"
+							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+						/>
+					</svg>
+				</div>
+			{/if}
+
+			<!-- End of History Message -->
+			{#if !hasMore && checkins.length > 0}
+				<div class="text-center py-8 text-gray-500">
+					<p>You've reached the beginning of your watch history</p>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

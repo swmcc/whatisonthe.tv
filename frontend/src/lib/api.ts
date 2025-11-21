@@ -122,8 +122,12 @@ export const api = {
 				requiresAuth: true
 			});
 		},
-		list: async (limit: number = 50, offset: number = 0) => {
-			return request(`/checkins?limit=${limit}&offset=${offset}`, {
+		list: async (days: number = 10, beforeDate?: string) => {
+			const params = new URLSearchParams({ days: days.toString() });
+			if (beforeDate) {
+				params.append('before_date', beforeDate);
+			}
+			return request(`/checkins?${params.toString()}`, {
 				requiresAuth: true
 			});
 		},
