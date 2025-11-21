@@ -9,6 +9,7 @@ class UserBase(BaseModel):
     """Base user schema."""
 
     email: EmailStr
+    username: str | None = Field(None, min_length=2, max_length=50)
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
 
@@ -22,6 +23,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """Schema for updating user profile."""
 
+    username: str | None = Field(None, min_length=2, max_length=50)
     first_name: str | None = Field(None, min_length=1, max_length=100)
     last_name: str | None = Field(None, min_length=1, max_length=100)
 

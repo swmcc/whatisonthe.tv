@@ -55,7 +55,7 @@ export const api = {
 				requiresAuth: true
 			});
 		},
-		updateProfile: async (data: { first_name?: string; last_name?: string }) => {
+		updateProfile: async (data: { username?: string | null; first_name?: string; last_name?: string }) => {
 			return request('/auth/me', {
 				method: 'PATCH',
 				body: JSON.stringify(data),

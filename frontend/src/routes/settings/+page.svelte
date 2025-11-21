@@ -5,6 +5,7 @@
 	import { auth } from '$lib/stores/auth';
 
 	let user: any = null;
+	let username = '';
 	let firstName = '';
 	let lastName = '';
 	let currentPassword = '';
@@ -26,6 +27,7 @@
 		const currentUser = $auth.user;
 		if (currentUser) {
 			user = currentUser;
+			username = currentUser.username || '';
 			firstName = currentUser.first_name || '';
 			lastName = currentUser.last_name || '';
 		}
@@ -38,6 +40,7 @@
 
 		try {
 			const updated = await api.auth.updateProfile({
+				username: username || null,
 				first_name: firstName,
 				last_name: lastName
 			});
@@ -182,6 +185,22 @@
 								<path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
 							</svg>
 							Email address cannot be changed
+						</p>
+					</div>
+
+					<div>
+						<label for="username" class="block text-sm font-semibold text-gray-700 mb-2">
+							Username
+						</label>
+						<input
+							id="username"
+							type="text"
+							bind:value={username}
+							placeholder="Enter your username (optional)"
+							class="block w-full px-4 py-2.5 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm placeholder-gray-400"
+						/>
+						<p class="mt-1.5 text-xs text-gray-500">
+							Your unique handle (e.g., swmcc, dhh)
 						</p>
 					</div>
 

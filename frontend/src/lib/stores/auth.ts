@@ -4,6 +4,7 @@ import { browser } from '$app/environment';
 export interface User {
 	id: number;
 	email: string;
+	username: string | null;
 	first_name: string;
 	last_name: string;
 	created_at: string;
