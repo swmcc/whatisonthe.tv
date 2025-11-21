@@ -18,6 +18,9 @@
 	let loadingProfile = false;
 	let loadingPassword = false;
 
+	// Tab management
+	let activeTab: 'profile' | 'security' = 'profile';
+
 	$: if ($auth.user) {
 		user = $auth.user;
 		firstName = user.first_name || '';
@@ -84,27 +87,56 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50 py-8">
-	<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+	<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
 		<!-- Header -->
 		<div class="mb-8">
 			<h1 class="text-4xl font-bold text-gray-900">Account Settings</h1>
 			<p class="mt-3 text-lg text-gray-600">Manage your profile information and security settings</p>
 		</div>
 
-		<div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
-			<!-- Profile Settings Card -->
-			<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-				<div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5">
-					<h2 class="text-xl font-semibold text-white flex items-center gap-2">
-						<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-						</svg>
-						Profile Information
-					</h2>
-					<p class="mt-1 text-sm text-indigo-100">Update your personal details</p>
-				</div>
+		<!-- Tabs Container -->
+		<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+			<!-- Tab Navigation -->
+			<div class="border-b border-gray-200">
+				<nav class="flex -mb-px">
+					<button
+						on:click={() => activeTab = 'profile'}
+						class="flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-all {activeTab === 'profile'
+							? 'border-indigo-600 text-indigo-600 bg-indigo-50'
+							: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+					>
+						<span class="flex items-center justify-center gap-2">
+							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+							</svg>
+							Profile
+						</span>
+					</button>
+					<button
+						on:click={() => activeTab = 'security'}
+						class="flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-all {activeTab === 'security'
+							? 'border-purple-600 text-purple-600 bg-purple-50'
+							: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+					>
+						<span class="flex items-center justify-center gap-2">
+							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+							</svg>
+							Security
+						</span>
+					</button>
+				</nav>
+			</div>
 
-				<form on:submit|preventDefault={handleProfileUpdate} class="p-6 space-y-5">
+			<!-- Tab Content -->
+			{#if activeTab === 'profile'}
+				<!-- Profile Tab -->
+				<form on:submit|preventDefault={handleProfileUpdate} class="p-8 space-y-6">
+					<div class="mb-6">
+						<h2 class="text-2xl font-semibold text-gray-900">Profile Information</h2>
+						<p class="mt-1 text-sm text-gray-600">Update your personal details</p>
+					</div>
+
 					{#if profileSuccess}
 						<div class="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
 							<svg class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -193,21 +225,14 @@
 						{/if}
 					</button>
 				</form>
-			</div>
+			{:else if activeTab === 'security'}
+				<!-- Security Tab -->
+				<form on:submit|preventDefault={handlePasswordUpdate} class="p-8 space-y-6">
+					<div class="mb-6">
+						<h2 class="text-2xl font-semibold text-gray-900">Security</h2>
+						<p class="mt-1 text-sm text-gray-600">Change your password</p>
+					</div>
 
-			<!-- Password Settings Card -->
-			<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-				<div class="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-5">
-					<h2 class="text-xl font-semibold text-white flex items-center gap-2">
-						<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-						</svg>
-						Security
-					</h2>
-					<p class="mt-1 text-sm text-purple-100">Change your password</p>
-				</div>
-
-				<form on:submit|preventDefault={handlePasswordUpdate} class="p-6 space-y-5">
 					{#if passwordSuccess}
 						<div class="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
 							<svg class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -290,7 +315,7 @@
 						{/if}
 					</button>
 				</form>
-			</div>
+			{/if}
 		</div>
 	</div>
 </div>
