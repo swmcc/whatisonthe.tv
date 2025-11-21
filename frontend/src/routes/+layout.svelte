@@ -8,9 +8,24 @@
 
 	let menuOpen = false;
 
+	// List of public routes that don't require authentication
+	const publicRoutes = ['/login', '/about', '/colophon'];
+
+	// Check if current path is a username profile page (starts with / and is a single segment)
+	function isPublicProfilePage(pathname: string): boolean {
+		// Match /{username} but not /login, /about, /colophon, /show, /checkins, /settings
+		const segments = pathname.split('/').filter(s => s.length > 0);
+		if (segments.length !== 1) return false;
+
+		const knownRoutes = ['login', 'about', 'colophon', 'show', 'checkins', 'settings'];
+		return !knownRoutes.includes(segments[0]);
+	}
+
 	// Check authentication on mount - just redirect to login if no token
 	onMount(async () => {
-		if (!$auth.token && $page.url.pathname !== '/login') {
+		const isPublic = publicRoutes.includes($page.url.pathname) || isPublicProfilePage($page.url.pathname);
+
+		if (!$auth.token && !isPublic) {
 			goto('/login');
 		}
 
@@ -48,6 +63,9 @@
 </script>
 
 {#if $page.url.pathname === '/login'}
+	<slot />
+{:else if isPublicProfilePage($page.url.pathname)}
+	<!-- Public profile page - render without authentication -->
 	<slot />
 {:else if $auth.user}
 	<div class="min-h-screen bg-gray-50">
