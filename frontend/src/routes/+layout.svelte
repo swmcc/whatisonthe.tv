@@ -13,11 +13,27 @@
 		if (!$auth.token && $page.url.pathname !== '/login') {
 			goto('/login');
 		}
+
+		// Close menu on ESC key
+		function handleKeydown(event: KeyboardEvent) {
+			if (event.key === 'Escape' && menuOpen) {
+				menuOpen = false;
+			}
+		}
+
+		window.addEventListener('keydown', handleKeydown);
+		return () => window.removeEventListener('keydown', handleKeydown);
 	});
 
 	// Reactive: redirect to home if authenticated and on login page
 	$: if ($auth.token && $page.url.pathname === '/login') {
+		menuOpen = false;
 		goto('/');
+	}
+
+	// Close menu when navigating to a different page
+	$: if ($page.url.pathname) {
+		menuOpen = false;
 	}
 
 	async function handleLogout() {
