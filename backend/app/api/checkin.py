@@ -465,3 +465,79 @@ async def list_content_checkins(
     checkins = result.scalars().all()
 
     return [CheckinResponse.model_validate(checkin) for checkin in checkins]
+
+
+@router.get("/user/{username}", response_model=list[CheckinResponse])
+async def list_public_checkins(
+    username: str,
+    db: AsyncSession = Depends(get_db),
+    days: int = 10,
+    before_date: str | None = None,
+):
+    """
+    List all public checkins for a user by username (no authentication required).
+
+    Args:
+        username: Username of the user
+        db: Database session
+        days: Number of days to fetch (default 10 for initial load, 3 for pagination)
+        before_date: ISO date string to fetch checkins before this date (for infinite scroll)
+
+    Returns:
+        List of user's public checkins for the requested days
+
+    Raises:
+        HTTPException: If user not found or has no username set
+    """
+    from datetime import datetime, timedelta
+
+    # Find user by username
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with username '{username}' not found",
+        )
+
+    # Build query
+    query = (
+        select(Checkin)
+        .where(Checkin.user_id == user.id)
+        .options(selectinload(Checkin.content), selectinload(Checkin.episode))
+        .order_by(Checkin.watched_at.desc())
+    )
+
+    # If before_date provided, filter checkins before that date
+    if before_date:
+        try:
+            before_dt = datetime.fromisoformat(before_date.replace('Z', '+00:00'))
+            query = query.where(Checkin.watched_at < before_dt)
+        except (ValueError, AttributeError):
+            pass  # Ignore invalid date format
+
+    # Fetch checkins
+    result = await db.execute(query.limit(1000))  # Generous limit to get enough for N days
+    all_checkins = result.scalars().all()
+
+    # Group by day and limit to requested number of days
+    from collections import defaultdict
+    days_dict = defaultdict(list)
+
+    for checkin in all_checkins:
+        day_key = checkin.watched_at.date()
+        days_dict[day_key].append(checkin)
+
+    # Get the requested number of days (sorted)
+    sorted_days = sorted(days_dict.keys(), reverse=True)[:days]
+
+    # Collect checkins from those days only
+    filtered_checkins = []
+    for day in sorted_days:
+        filtered_checkins.extend(days_dict[day])
+
+    # Sort by watched_at descending
+    filtered_checkins.sort(key=lambda c: c.watched_at, reverse=True)
+
+    return [CheckinResponse.model_validate(checkin) for checkin in filtered_checkins]

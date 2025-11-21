@@ -131,6 +131,15 @@ export const api = {
 				requiresAuth: true
 			});
 		},
+		listByUsername: async (username: string, days: number = 10, beforeDate?: string) => {
+			const params = new URLSearchParams({ days: days.toString() });
+			if (beforeDate) {
+				params.append('before_date', beforeDate);
+			}
+			return request(`/checkins/user/${username}?${params.toString()}`, {
+				requiresAuth: false
+			});
+		},
 		get: async (id: number) => {
 			return request(`/checkins/${id}`, {
 				requiresAuth: true
