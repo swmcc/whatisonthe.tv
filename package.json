@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
-    "postinstall": "npm run build"
+    "build": "cd frontend && npm ci && npm run build",
+    "heroku-postbuild": "npm run build"
   },
   "engines": {
     "node": ">=18.0.0",
