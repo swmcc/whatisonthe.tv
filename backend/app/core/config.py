@@ -12,6 +12,8 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        # Don't try to parse cors_origins from env automatically
+        env_ignore=["cors_origins"],
     )
 
     # Application
