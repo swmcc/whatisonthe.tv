@@ -374,40 +374,43 @@ def _save_aliases(db, entity_id: int, entity_type: str, aliases_data: list):
 
 
 def _save_seasons_and_episodes(db, content: Content, tvdb_id: int, api_data: dict):
-    """Save seasons and episodes for a series."""
+    """Save seasons and episodes for a series (idempotent - only adds new ones)."""
     # Get seasons data from API response
     seasons_data = api_data.get("seasons", [])
 
     if not seasons_data:
         return
 
-    # Clear existing episodes first (to avoid foreign key issues)
-    stmt = select(Episode).where(Episode.content_id == content.id)
-    result = db.execute(stmt)
-    existing_episodes = result.scalars().all()
-    for episode in existing_episodes:
-        db.delete(episode)
-
-    # Clear existing seasons
+    # Get existing seasons by tvdb_id for lookup
     stmt = select(Season).where(Season.content_id == content.id)
     result = db.execute(stmt)
-    existing_seasons = result.scalars().all()
-    for season in existing_seasons:
-        db.delete(season)
+    existing_seasons_by_tvdb_id = {s.tvdb_id: s for s in result.scalars().all()}
 
-    # Flush deletes to avoid constraint violations
-    db.flush()
-
-    # Process each season
+    # Process each season - only add if it doesn't exist
     for season_data in seasons_data:
         season_tvdb_id = season_data.get("id")
         if not season_tvdb_id:
             continue
 
+        # Check if season already exists
+        if season_tvdb_id in existing_seasons_by_tvdb_id:
+            # Season exists, update it
+            season = existing_seasons_by_tvdb_id[season_tvdb_id]
+            season.name = season_data.get("name")
+            season.overview = season_data.get("overview")
+            season.image_url = season_data.get("image")
+            season_type = season_data.get("type", {})
+            season.season_type = season_type.get("name") if isinstance(season_type, dict) else None
+            season.season_type_id = season_type.get("id") if isinstance(season_type, dict) else None
+            season.year = season_data.get("year")
+            season.last_synced_at = datetime.utcnow()
+            season.extra_metadata = season_data
+            continue
+
         season_number = season_data.get("number", 0)
         season_type = season_data.get("type", {})
 
-        # Create new season
+        # Create new season only if it doesn't exist
         season = Season(
             tvdb_id=season_tvdb_id,
             content_id=content.id,
@@ -439,7 +442,12 @@ def _save_seasons_and_episodes(db, content: Content, tvdb_id: int, api_data: dic
     result = db.execute(stmt)
     seasons_by_number = {s.season_number: s for s in result.scalars().all()}
 
-    # Process each episode
+    # Get existing episodes by tvdb_id for lookup
+    stmt = select(Episode).where(Episode.content_id == content.id)
+    result = db.execute(stmt)
+    existing_episodes_by_tvdb_id = {e.tvdb_id: e for e in result.scalars().all()}
+
+    # Process each episode - only add if it doesn't exist
     for episode_data in episodes_data:
         episode_tvdb_id = episode_data.get("id")
         if not episode_tvdb_id:
@@ -461,7 +469,30 @@ def _save_seasons_and_episodes(db, content: Content, tvdb_id: int, api_data: dic
             except:
                 pass
 
-        # Create new episode
+        # Check if episode already exists
+        if episode_tvdb_id in existing_episodes_by_tvdb_id:
+            # Episode exists, update it
+            episode = existing_episodes_by_tvdb_id[episode_tvdb_id]
+            episode.season_id = season.id if season else None
+            episode.season_number = season_number
+            episode.episode_number = episode_number
+            episode.absolute_number = episode_data.get("absoluteNumber")
+            episode.name = episode_data.get("name")
+            episode.overview = episode_data.get("overview")
+            episode.image_url = episode_data.get("image")
+            episode.aired = aired_date
+            episode.runtime = episode_data.get("runtime")
+            episode.year = episode_data.get("year")
+            episode.is_movie = episode_data.get("isMovie", 0)
+            episode.finale_type = episode_data.get("finaleType")
+            episode.airs_before_season = episode_data.get("airsBeforeSeason")
+            episode.airs_before_episode = episode_data.get("airsBeforeEpisode")
+            episode.airs_after_season = episode_data.get("airsAfterSeason")
+            episode.last_synced_at = datetime.utcnow()
+            episode.extra_metadata = episode_data
+            continue
+
+        # Create new episode only if it doesn't exist
         episode = Episode(
             tvdb_id=episode_tvdb_id,
             content_id=content.id,
