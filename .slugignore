@@ -1,9 +1,12 @@
 # Exclude from Heroku slug to reduce size
+# Keep package.json and package-lock.json for builds
 frontend/node_modules/
 frontend/src/
 frontend/.svelte-kit/dev/
 frontend/static/
 !frontend/build/
+!frontend/package.json
+!frontend/package-lock.json
 *.md
 !HEROKU_DEPLOYMENT.md
 .git/
