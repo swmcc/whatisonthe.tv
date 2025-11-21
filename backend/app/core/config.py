@@ -1,6 +1,8 @@
 """Application configuration."""
 
 import os
+from typing import Union
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,8 +14,6 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
-        # Don't try to parse cors_origins from env automatically
-        env_ignore=["cors_origins"],
     )
 
     # Application
@@ -31,13 +31,21 @@ class Settings(BaseSettings):
     tvdb_api_key: str = ""
     tvdb_pin: str = ""
 
-    # CORS
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"]
+    # CORS - can be a comma-separated string or list
+    cors_origins: Union[list[str], str] = "http://localhost:5173,http://localhost:5174,http://localhost:3000"
 
     # Security
     secret_key: str = "your-secret-key-change-in-production-min-32-chars-long"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS origins from comma-separated string or list."""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     def __init__(self, **kwargs):
         """Initialize settings with Heroku environment variable support."""
@@ -58,11 +66,6 @@ class Settings(BaseSettings):
         redis_url = os.getenv("REDIS_URL")
         if redis_url:
             self.redis_url = redis_url
-
-        # Parse CORS origins from comma-separated string (for Heroku config)
-        cors_env = os.getenv("CORS_ORIGINS")
-        if cors_env and cors_env.strip():
-            self.cors_origins = [origin.strip() for origin in cors_env.split(",")]
 
 
 settings = Settings()
