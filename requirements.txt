@@ -1,0 +1,5 @@
+# Import backend requirements
+-r backend/requirements.txt
+
+# Heroku-specific
+gunicorn==21.2.0

@@ -1,0 +1,19 @@
+# Exclude from Heroku slug to reduce size
+frontend/node_modules/
+frontend/src/
+frontend/.svelte-kit/
+frontend/static/
+*.md
+.git/
+.github/
+tests/
+*.log
+*.pyc
+__pycache__/
+.env
+.env.*
+!.env.example
+docker-compose.yml
+Makefile
+.vscode/
+.idea/

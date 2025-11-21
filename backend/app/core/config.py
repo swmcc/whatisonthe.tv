@@ -1,5 +1,6 @@
 """Application configuration."""
 
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,6 +36,29 @@ class Settings(BaseSettings):
     secret_key: str = "your-secret-key-change-in-production-min-32-chars-long"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+
+    def __init__(self, **kwargs):
+        """Initialize settings with Heroku environment variable support."""
+        super().__init__(**kwargs)
+
+        # Heroku provides DATABASE_URL for Postgres
+        if os.getenv("DATABASE_URL"):
+            db_url = os.getenv("DATABASE_URL")
+            # Heroku uses postgres://, SQLAlchemy 1.4+ requires postgresql://
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+            # Add asyncpg driver
+            if "postgresql://" in db_url and "+asyncpg" not in db_url:
+                db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            self.database_url = db_url
+
+        # Heroku provides REDIS_URL for Redis
+        if os.getenv("REDIS_URL"):
+            self.redis_url = os.getenv("REDIS_URL")
+
+        # Parse CORS origins from comma-separated string (for Heroku config)
+        if os.getenv("CORS_ORIGINS"):
+            self.cors_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS").split(",")]
 
 
 settings = Settings()

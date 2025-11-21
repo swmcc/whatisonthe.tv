@@ -1,0 +1,54 @@
+{
+  "name": "What Is On The TV",
+  "description": "A watch logging and tracking application for TV shows and movies",
+  "repository": "https://github.com/swmcc/whatisonthe.tv",
+  "keywords": ["python", "fastapi", "postgresql", "redis", "celery", "tvdb"],
+  "addons": [
+    {
+      "plan": "heroku-postgresql:mini",
+      "as": "DATABASE"
+    },
+    {
+      "plan": "heroku-redis:mini",
+      "as": "REDIS"
+    }
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "env": {
+    "DEBUG": {
+      "description": "Enable debug mode",
+      "value": "false"
+    },
+    "SECRET_KEY": {
+      "description": "Secret key for JWT tokens (min 32 chars)",
+      "generator": "secret"
+    },
+    "TVDB_API_KEY": {
+      "description": "TVDB API key",
+      "required": true
+    },
+    "TVDB_PIN": {
+      "description": "TVDB API PIN",
+      "required": true
+    },
+    "CORS_ORIGINS": {
+      "description": "Comma-separated list of allowed CORS origins",
+      "value": "https://whatisonthe.tv,https://www.whatisonthe.tv"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    },
+    "worker": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "stack": "heroku-24"
+}
