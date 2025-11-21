@@ -2,8 +2,11 @@
   "name": "whatisonthe-tv",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
-    "build": "cd frontend && rm -rf node_modules && npm install && npm run build",
+    "build": "npm run build --workspace=frontend",
     "heroku-postbuild": "npm run build"
   },
   "engines": {
