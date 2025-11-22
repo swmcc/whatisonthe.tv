@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import DateFilter from '$lib/components/DateFilter.svelte';
 
 	let checkins: any[] = [];
 	let loading = true;
@@ -10,26 +11,50 @@
 	let hasMore = true;
 	let oldestDate: string | null = null;
 	let searchQuery = '';
+	let startDateFilter = '';
+	let endDateFilter = '';
 
-	// Filter checkins based on search query
-	$: filteredCheckins = searchQuery
-		? checkins.filter((checkin) => {
-				const query = searchQuery.toLowerCase();
-				const contentName = checkin.content?.name?.toLowerCase() || '';
-				const episodeName = checkin.episode?.name?.toLowerCase() || '';
-				const location = checkin.location?.toLowerCase() || '';
-				const watchedWith = checkin.watched_with?.toLowerCase() || '';
-				const notes = checkin.notes?.toLowerCase() || '';
+	// Filter checkins based on search query and date range
+	$: filteredCheckins = checkins.filter((checkin) => {
+		// Text search filter
+		if (searchQuery) {
+			const query = searchQuery.toLowerCase();
+			const contentName = checkin.content?.name?.toLowerCase() || '';
+			const episodeName = checkin.episode?.name?.toLowerCase() || '';
+			const location = checkin.location?.toLowerCase() || '';
+			const watchedWith = checkin.watched_with?.toLowerCase() || '';
+			const notes = checkin.notes?.toLowerCase() || '';
 
-				return (
-					contentName.includes(query) ||
-					episodeName.includes(query) ||
-					location.includes(query) ||
-					watchedWith.includes(query) ||
-					notes.includes(query)
-				);
-		  })
-		: checkins;
+			const matchesSearch =
+				contentName.includes(query) ||
+				episodeName.includes(query) ||
+				location.includes(query) ||
+				watchedWith.includes(query) ||
+				notes.includes(query);
+
+			if (!matchesSearch) return false;
+		}
+
+		// Date range filter
+		if (startDateFilter || endDateFilter) {
+			const checkinDate = new Date(checkin.watched_at);
+			checkinDate.setHours(0, 0, 0, 0); // Normalize to start of day
+
+			if (startDateFilter) {
+				const startDate = new Date(startDateFilter);
+				startDate.setHours(0, 0, 0, 0);
+				if (checkinDate < startDate) return false;
+			}
+
+			if (endDateFilter) {
+				const endDate = new Date(endDateFilter);
+				endDate.setHours(23, 59, 59, 999); // End of day
+				if (checkinDate > endDate) return false;
+			}
+		}
+
+		return true;
+	});
 
 	// Group filtered checkins by day
 	$: groupedCheckins = groupByDay(filteredCheckins);
@@ -144,6 +169,11 @@
 		});
 	}
 
+	function handleDateFilterChange(event: CustomEvent<{ startDate: string; endDate: string }>) {
+		startDateFilter = event.detail.startDate;
+		endDateFilter = event.detail.endDate;
+	}
+
 	const PLACEHOLDER_POSTER =
 		'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="150"%3E%3Crect fill="%23e5e7eb" width="100" height="150"/%3E%3Ctext fill="%236b7280" font-family="Arial" font-size="12" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3ENo Poster%3C/text%3E%3C/svg%3E';
 </script>
@@ -152,6 +182,15 @@
 	<div class="mb-8">
 		<h1 class="text-3xl font-bold text-gray-900">My Check-ins</h1>
 		<p class="mt-2 text-gray-600">View your watching history</p>
+
+		<!-- Date Filter -->
+		<div class="mt-6">
+			<DateFilter
+				startDate={startDateFilter}
+				endDate={endDateFilter}
+				on:change={handleDateFilterChange}
+			/>
+		</div>
 
 		<!-- Search Bar -->
 		<div class="mt-4">
@@ -181,13 +220,21 @@
 					</div>
 				{/if}
 			</div>
-			{#if searchQuery && filteredCheckins.length === 0 && !loading}
+			{#if (searchQuery || startDateFilter || endDateFilter) && filteredCheckins.length === 0 && !loading}
 				<p class="mt-2 text-sm text-gray-500">
-					No check-ins found matching "{searchQuery}"
+					No check-ins found{searchQuery ? ` matching "${searchQuery}"` : ''}
+					{startDateFilter || endDateFilter ? ' in selected date range' : ''}
 				</p>
-			{:else if searchQuery}
+			{:else if searchQuery || startDateFilter || endDateFilter}
 				<p class="mt-2 text-sm text-gray-500">
 					Found {filteredCheckins.length} check-in{filteredCheckins.length !== 1 ? 's' : ''}
+					{#if searchQuery && (startDateFilter || endDateFilter)}
+						matching "{searchQuery}" in selected date range
+					{:else if searchQuery}
+						matching "{searchQuery}"
+					{:else if startDateFilter || endDateFilter}
+						in selected date range
+					{/if}
 				</p>
 			{/if}
 		</div>
