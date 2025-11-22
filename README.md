@@ -2,6 +2,8 @@
 
 Track your TV shows and movies with check-ins, search, and viewing history.
 
+**[🌐 Visit Site](https://www.whatisonthe.tv)**
+
 ## Tech Stack
 
 **Backend:**
