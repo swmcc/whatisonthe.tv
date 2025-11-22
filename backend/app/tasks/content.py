@@ -395,6 +395,12 @@ def _save_seasons_and_episodes(db, content: Content, tvdb_id: int, api_data: dic
         season_number = season_data.get("number", 0)
         season_type = season_data.get("type", {})
 
+        # IMPORTANT: Only save "Aired Order" seasons (type_id = 1)
+        # This prevents duplicate seasons with different ordering types
+        season_type_id = season_type.get("id") if isinstance(season_type, dict) else None
+        if season_type_id and season_type_id != 1:
+            continue  # Skip DVD Order, Absolute Order, etc.
+
         # Check if season already exists by season_number
         if season_number in existing_seasons_by_number:
             # Season exists, update it
