@@ -439,26 +439,35 @@ async def delete_checkin(
     return None
 
 
-@router.get("/content/{content_id}", response_model=list[CheckinResponse])
+@router.get("/content/{tvdb_id}", response_model=list[CheckinResponse])
 async def list_content_checkins(
-    content_id: int,
+    tvdb_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    List all checkins for a specific content (movie or series).
+    List all checkins for a specific content (movie or series) by TVDB ID.
 
     Args:
-        content_id: ID of the content
+        tvdb_id: TVDB ID of the content
         current_user: Current authenticated user
         db: Database session
 
     Returns:
         List of checkins for the content
     """
+    # First, find the content by TVDB ID
+    content_result = await db.execute(
+        select(Content).where(Content.tvdb_id == tvdb_id)
+    )
+    content = content_result.scalar_one_or_none()
+
+    if not content:
+        return []
+
     result = await db.execute(
         select(Checkin)
-        .where(Checkin.user_id == current_user.id, Checkin.content_id == content_id)
+        .where(Checkin.user_id == current_user.id, Checkin.content_id == content.id)
         .options(selectinload(Checkin.content), selectinload(Checkin.episode))
         .order_by(Checkin.watched_at.desc())
     )

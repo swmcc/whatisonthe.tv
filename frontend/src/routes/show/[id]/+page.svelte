@@ -14,6 +14,7 @@
 	let seasons: any[] = [];
 	let loadingSeasons = false;
 	let expandedSeasons = new Set<number>();
+	let checkedInEpisodes = new Set<number>();
 
 	// Check-in modal state
 	let showCheckInModal = false;
@@ -70,9 +71,23 @@
 			loading = false;
 		}
 
-		// If it's a series, load seasons
+		// If it's a series, load seasons and check-ins
 		if (isSeries && data) {
-			await loadSeasons();
+			await Promise.all([loadSeasons(), loadCheckins()]);
+		}
+	}
+
+	async function loadCheckins() {
+		try {
+			const checkins = await api.checkin.listByContent(parseInt(id));
+			// Build a set of episode IDs that have been checked in
+			checkedInEpisodes = new Set(
+				checkins
+					.filter((c: any) => c.episode)
+					.map((c: any) => c.episode.id)
+			);
+		} catch (e) {
+			console.error('Failed to load check-ins:', e);
 		}
 	}
 
@@ -132,9 +147,12 @@
 		checkInData = null;
 	}
 
-	function handleCheckInSuccess() {
-		// Could reload check-in data here if we want to show check-in history
+	async function handleCheckInSuccess() {
+		// Reload check-ins to update the UI
 		console.log('Check-in successful!');
+		if (isSeries) {
+			await loadCheckins();
+		}
 	}
 
 	const PLACEHOLDER_POSTER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="500" height="750"%3E%3Crect fill="%23e5e7eb" width="500" height="750"/%3E%3Ctext fill="%236b7280" font-family="Arial" font-size="24" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3ENo Poster%3C/text%3E%3C/svg%3E';
@@ -589,10 +607,11 @@
 
 														<!-- Check-in Button -->
 														<div class="flex-shrink-0">
+															{@const isCheckedIn = checkedInEpisodes.has(episode.id)}
 															<button
 																on:click={() => openCheckInModal(episode, season)}
-																class="px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-																title="Check in this episode"
+																class="px-3 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 transition-colors {isCheckedIn ? 'text-green-600 bg-green-50 hover:bg-green-100 focus:ring-green-500' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 focus:ring-indigo-500'}"
+																title="{isCheckedIn ? 'Checked in - Click to check in again' : 'Check in this episode'}"
 															>
 																<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
