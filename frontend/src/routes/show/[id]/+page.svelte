@@ -606,18 +606,20 @@
 														</div>
 
 														<!-- Check-in Button -->
-														<div class="flex-shrink-0">
+														{#if episode.id}
 															{@const isCheckedIn = checkedInEpisodes.has(episode.id)}
-															<button
-																on:click={() => openCheckInModal(episode, season)}
-																class="px-3 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 transition-colors {isCheckedIn ? 'text-green-600 bg-green-50 hover:bg-green-100 focus:ring-green-500' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 focus:ring-indigo-500'}"
-																title="{isCheckedIn ? 'Checked in - Click to check in again' : 'Check in this episode'}"
-															>
-																<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-																</svg>
-															</button>
-														</div>
+															<div class="flex-shrink-0">
+																<button
+																	on:click={() => openCheckInModal(episode, season)}
+																	class="px-3 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 transition-colors {isCheckedIn ? 'text-green-600 bg-green-50 hover:bg-green-100 focus:ring-green-500' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 focus:ring-indigo-500'}"
+																	title="{isCheckedIn ? 'Checked in - Click to check in again' : 'Check in this episode'}"
+																>
+																	<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+																	</svg>
+																</button>
+															</div>
+														{/if}
 													</div>
 												{/each}
 											</div>
