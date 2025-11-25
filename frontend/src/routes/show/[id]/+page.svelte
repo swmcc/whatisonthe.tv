@@ -80,11 +80,11 @@
 	async function loadCheckins() {
 		try {
 			const checkins = await api.checkin.listByContent(parseInt(id));
-			// Build a set of episode IDs that have been checked in
+			// Build a set of episode TVDB IDs that have been checked in
 			checkedInEpisodes = new Set(
 				checkins
 					.filter((c: any) => c.episode)
-					.map((c: any) => c.episode.id)
+					.map((c: any) => c.episode.tvdb_id)
 			);
 		} catch (e) {
 			console.error('Failed to load check-ins:', e);

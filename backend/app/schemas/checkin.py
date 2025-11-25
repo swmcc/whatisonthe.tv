@@ -50,6 +50,7 @@ class EpisodeSummary(BaseModel):
     """Summary of episode for checkin response."""
 
     id: int
+    tvdb_id: int
     name: Optional[str] = None
     season_number: int
     episode_number: int
