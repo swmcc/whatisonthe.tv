@@ -148,34 +148,7 @@
 	<div class="w-full max-w-6xl mx-auto">
 		<div class="text-center mb-8">
 			<div class="flex justify-center mb-4">
-				<svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-					<!-- Antenna -->
-					<line x1="35" y1="15" x2="25" y2="5" stroke="#8B4513" stroke-width="2" stroke-linecap="round"/>
-					<line x1="65" y1="15" x2="75" y2="5" stroke="#8B4513" stroke-width="2" stroke-linecap="round"/>
-					<circle cx="25" cy="5" r="2" fill="#8B4513"/>
-					<circle cx="75" cy="5" r="2" fill="#8B4513"/>
-
-					<!-- TV Body -->
-					<rect x="15" y="20" width="70" height="60" rx="8" fill="#8B4513"/>
-					<rect x="18" y="23" width="64" height="54" rx="6" fill="#A0522D"/>
-
-					<!-- Screen -->
-					<rect x="23" y="28" width="54" height="38" rx="3" fill="#2D4F67"/>
-					<rect x="25" y="30" width="50" height="34" rx="2" fill="#4A90B5" opacity="0.6"/>
-
-					<!-- Control Panel -->
-					<circle cx="72" cy="72" r="3" fill="#654321"/>
-					<circle cx="65" cy="72" r="2.5" fill="#654321"/>
-					<circle cx="58" cy="72" r="2" fill="#654321"/>
-
-					<!-- Speaker grille -->
-					<line x1="28" y1="72" x2="48" y2="72" stroke="#654321" stroke-width="1"/>
-					<line x1="28" y1="75" x2="48" y2="75" stroke="#654321" stroke-width="1"/>
-
-					<!-- TV Legs -->
-					<rect x="28" y="80" width="8" height="10" rx="2" fill="#8B4513"/>
-					<rect x="64" y="80" width="8" height="10" rx="2" fill="#8B4513"/>
-				</svg>
+				<img src="https://swm.cc/projects/whatisonthe-tv.svg" alt="What Is On The TV" width="120" height="120" />
 			</div>
 			<p class="text-gray-600">Search for TV shows and movies</p>
 		</div>
