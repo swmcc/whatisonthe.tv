@@ -1,11 +1,24 @@
-import { auth } from './stores/auth';
+import { auth, isTokenExpired } from './stores/auth';
 import { get } from 'svelte/store';
+import { goto } from '$app/navigation';
+import { browser } from '$app/environment';
 
 // Use relative URLs in production (empty string), localhost in development
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '' : 'http://localhost:8000');
 
 interface RequestOptions extends RequestInit {
 	requiresAuth?: boolean;
+}
+
+/**
+ * Custom error class for authentication failures.
+ * Allows callers to distinguish auth errors from other errors.
+ */
+export class AuthenticationError extends Error {
+	constructor(message: string = 'Your session has expired. Please log in again.') {
+		super(message);
+		this.name = 'AuthenticationError';
+	}
 }
 
 async function request(endpoint: string, options: RequestOptions = {}) {
@@ -18,15 +31,32 @@ async function request(endpoint: string, options: RequestOptions = {}) {
 
 	if (requiresAuth) {
 		const authState = get(auth);
-		if (authState.token) {
-			headers['Authorization'] = `Bearer ${authState.token}`;
+
+		// Check if token is expired before making the request
+		if (!authState.token || isTokenExpired(authState.token)) {
+			auth.handleAuthError();
+			if (browser) {
+				goto('/login');
+			}
+			throw new AuthenticationError();
 		}
+
+		headers['Authorization'] = `Bearer ${authState.token}`;
 	}
 
 	const response = await fetch(`${API_URL}${endpoint}`, {
 		...fetchOptions,
 		headers
 	});
+
+	// Handle 401 Unauthorized globally
+	if (response.status === 401) {
+		auth.handleAuthError();
+		if (browser) {
+			goto('/login');
+		}
+		throw new AuthenticationError();
+	}
 
 	if (!response.ok) {
 		const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
