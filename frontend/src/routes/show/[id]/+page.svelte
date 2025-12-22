@@ -106,11 +106,15 @@
 
 			seasons = seasonsList;
 
-			// Load episodes for each season
-			for (const season of seasons) {
-				const episodesResponse = await api.search.getSeasonEpisodes(parseInt(id), season.season_number);
-				season.episodes = episodesResponse.episodes || [];
-			}
+			// Load episodes for all seasons in parallel (much faster!)
+			await Promise.all(
+				seasons.map(async (season) => {
+					const episodesResponse = await api.search.getSeasonEpisodes(parseInt(id), season.season_number);
+					season.episodes = episodesResponse.episodes || [];
+				})
+			);
+			// Trigger reactivity after all episodes loaded
+			seasons = seasons;
 		} catch (e) {
 			console.error('Failed to load seasons:', e);
 		} finally {
