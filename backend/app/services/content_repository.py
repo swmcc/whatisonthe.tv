@@ -143,7 +143,7 @@ class ContentRepository:
 
     async def get_series_seasons(self, tvdb_id: int) -> list[dict[str, Any]]:
         """
-        Get all seasons for a series - DB first.
+        Get all seasons for a series - DB first, return cached even if stale.
 
         Args:
             tvdb_id: TVDB series ID
@@ -151,7 +151,7 @@ class ContentRepository:
         Returns:
             List of season dicts
         """
-        # First check if content exists and is fresh
+        # First check if content exists
         stmt = select(Content).where(
             Content.tvdb_id == tvdb_id,
             Content.content_type == "series"
@@ -162,23 +162,20 @@ class ContentRepository:
         if not content:
             return []
 
-        # If content is fresh, get seasons from DB
-        if self._is_fresh(content):
-            stmt = (
-                select(Season)
-                .where(Season.content_id == content.id)
-                .order_by(Season.season_number)
-            )
-            result = await self.db.execute(stmt)
-            seasons = result.scalars().all()
-            return [self._season_to_dict(season) for season in seasons]
-
-        # Content is stale - return empty and let background task refresh
-        return []
+        # Always return cached seasons if we have them (even if stale)
+        # Background task will refresh for next time
+        stmt = (
+            select(Season)
+            .where(Season.content_id == content.id)
+            .order_by(Season.season_number)
+        )
+        result = await self.db.execute(stmt)
+        seasons = result.scalars().all()
+        return [self._season_to_dict(season) for season in seasons]
 
     async def get_series_episodes(self, tvdb_id: int) -> list[dict[str, Any]]:
         """
-        Get all episodes for a series - DB first.
+        Get all episodes for a series - DB first, return cached even if stale.
 
         Args:
             tvdb_id: TVDB series ID
@@ -186,7 +183,7 @@ class ContentRepository:
         Returns:
             List of episode dicts
         """
-        # First check if content exists and is fresh
+        # First check if content exists
         stmt = select(Content).where(
             Content.tvdb_id == tvdb_id,
             Content.content_type == "series"
@@ -197,23 +194,20 @@ class ContentRepository:
         if not content:
             return []
 
-        # If content is fresh, get episodes from DB
-        if self._is_fresh(content):
-            stmt = (
-                select(Episode)
-                .where(Episode.content_id == content.id)
-                .order_by(Episode.season_number, Episode.episode_number)
-            )
-            result = await self.db.execute(stmt)
-            episodes = result.scalars().all()
-            return [self._episode_to_dict(episode) for episode in episodes]
-
-        # Content is stale - return empty and let background task refresh
-        return []
+        # Always return cached episodes if we have them (even if stale)
+        # Background task will refresh for next time
+        stmt = (
+            select(Episode)
+            .where(Episode.content_id == content.id)
+            .order_by(Episode.season_number, Episode.episode_number)
+        )
+        result = await self.db.execute(stmt)
+        episodes = result.scalars().all()
+        return [self._episode_to_dict(episode) for episode in episodes]
 
     async def get_season_episodes(self, tvdb_id: int, season_number: int) -> list[dict[str, Any]]:
         """
-        Get episodes for a specific season - DB first.
+        Get episodes for a specific season - DB first, return cached even if stale.
 
         Args:
             tvdb_id: TVDB series ID
@@ -222,7 +216,7 @@ class ContentRepository:
         Returns:
             List of episode dicts
         """
-        # First check if content exists and is fresh
+        # First check if content exists
         stmt = select(Content).where(
             Content.tvdb_id == tvdb_id,
             Content.content_type == "series"
@@ -233,22 +227,19 @@ class ContentRepository:
         if not content:
             return []
 
-        # If content is fresh, get episodes for this season from DB
-        if self._is_fresh(content):
-            stmt = (
-                select(Episode)
-                .where(
-                    Episode.content_id == content.id,
-                    Episode.season_number == season_number
-                )
-                .order_by(Episode.episode_number)
+        # Always return cached episodes if we have them (even if stale)
+        # Background task will refresh for next time
+        stmt = (
+            select(Episode)
+            .where(
+                Episode.content_id == content.id,
+                Episode.season_number == season_number
             )
-            result = await self.db.execute(stmt)
-            episodes = result.scalars().all()
-            return [self._episode_to_dict(episode) for episode in episodes]
-
-        # Content is stale - return empty and let background task refresh
-        return []
+            .order_by(Episode.episode_number)
+        )
+        result = await self.db.execute(stmt)
+        episodes = result.scalars().all()
+        return [self._episode_to_dict(episode) for episode in episodes]
 
     async def search(self, query: str, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
         """
