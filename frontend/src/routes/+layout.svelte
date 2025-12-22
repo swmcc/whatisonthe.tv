@@ -21,11 +21,12 @@
 		return !knownRoutes.includes(segments[0]);
 	}
 
-	// Check authentication on mount - just redirect to login if no token
+	// Check authentication on mount - validate token and redirect to login if invalid
 	onMount(async () => {
 		const isPublic = publicRoutes.includes($page.url.pathname) || isPublicProfilePage($page.url.pathname);
 
-		if (!$auth.token && !isPublic) {
+		// Use isValid() which checks expiration and clears auth if expired
+		if (!auth.isValid() && !isPublic) {
 			goto('/login');
 		}
 
