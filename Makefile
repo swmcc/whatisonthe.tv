@@ -70,6 +70,15 @@ local.db.revision: ## Create new migration (use MSG="description")
 	@echo "$(GREEN)==> Creating new migration...$(RESET)"
 	cd backend && python3 -m alembic revision --autogenerate -m "$(MSG)"
 
+local.db.pull: ## Pull production database from Heroku
+	@echo "$(GREEN)==> Downloading production database from Heroku...$(RESET)"
+	heroku pg:backups:capture --app whatisonthe-tv
+	heroku pg:backups:download --app whatisonthe-tv -o /tmp/heroku_db.dump
+	@echo "$(YELLOW)==> Restoring to local database...$(RESET)"
+	pg_restore --verbose --clean --no-acl --no-owner -U watchlog -d watchlog /tmp/heroku_db.dump || true
+	rm /tmp/heroku_db.dump
+	@echo "$(GREEN)✅ Production database pulled successfully$(RESET)"
+
 local.test: ## Run backend tests
 	@echo "$(GREEN)==> Running tests...$(RESET)"
 	cd backend && pytest
@@ -136,5 +145,6 @@ db-migrate: local.db.migrate
 db-upgrade: local.db.migrate
 db-downgrade: local.db.downgrade
 db-revision: local.db.revision
+db-pull: local.db.pull
 test: local.test
 test-cov: local.test.cov
