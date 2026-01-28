@@ -3,6 +3,7 @@
 	import { api } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import DateFilter from '$lib/components/DateFilter.svelte';
+	import CheckInModal from '$lib/components/CheckInModal.svelte';
 
 	let checkins: any[] = [];
 	let loading = true;
@@ -13,6 +14,8 @@
 	let searchQuery = '';
 	let startDateFilter = '';
 	let endDateFilter = '';
+	let showEditModal = false;
+	let editingCheckin: any = null;
 
 	// Filter checkins based on search query and date range
 	$: filteredCheckins = checkins.filter((checkin) => {
@@ -148,6 +151,18 @@
 		} catch (err) {
 			alert(err instanceof Error ? err.message : 'Failed to delete check-in');
 		}
+	}
+
+	function openEditModal(checkin: any) {
+		editingCheckin = checkin;
+		showEditModal = true;
+	}
+
+	async function handleEditSuccess() {
+		showEditModal = false;
+		editingCheckin = null;
+		// Reload checkins to reflect changes
+		await loadCheckins();
 	}
 
 	function formatEpisode(checkin: any) {
@@ -394,10 +409,25 @@
 									</div>
 								</div>
 
-								<!-- Delete Button -->
+								<!-- Action Buttons -->
+							<div class="ml-4 flex flex-col gap-1">
+								<button
+									on:click={() => openEditModal(checkin)}
+									class="p-2 text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
+									title="Edit check-in"
+								>
+									<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+										/>
+									</svg>
+								</button>
 								<button
 									on:click={() => deleteCheckin(checkin.id)}
-									class="ml-4 p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+									class="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
 									title="Delete check-in"
 								>
 									<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -409,6 +439,7 @@
 										/>
 									</svg>
 								</button>
+							</div>
 							</div>
 						</div>
 					</div>
@@ -453,3 +484,25 @@
 		</div>
 	{/if}
 </div>
+
+{#if showEditModal && editingCheckin}
+	<CheckInModal
+		mode="edit"
+		checkinId={editingCheckin.id}
+		contentId={editingCheckin.content.id}
+		contentName={editingCheckin.content.name}
+		contentType={editingCheckin.content.content_type}
+		episodeId={editingCheckin.episode?.id || null}
+		episodeName={editingCheckin.episode?.name || null}
+		seasonNumber={editingCheckin.episode?.season_number || null}
+		episodeNumber={editingCheckin.episode?.episode_number || null}
+		existingData={{
+			watched_at: editingCheckin.watched_at,
+			location: editingCheckin.location,
+			watched_with: editingCheckin.watched_with,
+			notes: editingCheckin.notes
+		}}
+		on:success={handleEditSuccess}
+		on:close={() => { showEditModal = false; editingCheckin = null; }}
+	/>
+{/if}

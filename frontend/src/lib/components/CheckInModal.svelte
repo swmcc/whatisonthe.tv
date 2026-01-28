@@ -9,13 +9,23 @@
 	export let episodeName: string | null = null;
 	export let seasonNumber: number | null = null;
 	export let episodeNumber: number | null = null;
+	export let mode: 'create' | 'edit' = 'create';
+	export let checkinId: number | null = null;
+	export let existingData: {
+		watched_at?: string;
+		location?: string;
+		watched_with?: string;
+		notes?: string;
+	} = {};
 
 	const dispatch = createEventDispatcher();
 
-	let watchedAt = new Date().toISOString().slice(0, 16);
-	let location = '';
-	let watchedWith = '';
-	let notes = '';
+	let watchedAt = existingData.watched_at
+		? new Date(existingData.watched_at).toISOString().slice(0, 16)
+		: new Date().toISOString().slice(0, 16);
+	let location = existingData.location || '';
+	let watchedWith = existingData.watched_with || '';
+	let notes = existingData.notes || '';
 	let loading = false;
 	let error = '';
 	let success = false;
@@ -33,14 +43,23 @@
 		success = false;
 
 		try {
-			await api.checkin.create({
-				content_id: contentId,
-				episode_id: episodeId || undefined,
-				watched_at: new Date(watchedAt).toISOString(),
-				location: location || undefined,
-				watched_with: watchedWith || undefined,
-				notes: notes || undefined
-			});
+			if (mode === 'edit' && checkinId) {
+				await api.checkin.update(checkinId, {
+					watched_at: new Date(watchedAt).toISOString(),
+					location: location || undefined,
+					watched_with: watchedWith || undefined,
+					notes: notes || undefined
+				});
+			} else {
+				await api.checkin.create({
+					content_id: contentId,
+					episode_id: episodeId || undefined,
+					watched_at: new Date(watchedAt).toISOString(),
+					location: location || undefined,
+					watched_with: watchedWith || undefined,
+					notes: notes || undefined
+				});
+			}
 
 			success = true;
 			setTimeout(() => {
@@ -48,7 +67,7 @@
 				close();
 			}, 1000);
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to create check-in';
+			error = err instanceof Error ? err.message : `Failed to ${mode === 'edit' ? 'update' : 'create'} check-in`;
 		} finally {
 			loading = false;
 		}
@@ -76,7 +95,7 @@
 		<!-- Header -->
 		<div class="px-6 py-4 border-b border-gray-200">
 			<div class="flex items-center justify-between">
-				<h3 class="text-lg font-semibold text-gray-900">Check In</h3>
+				<h3 class="text-lg font-semibold text-gray-900">{mode === 'edit' ? 'Edit Check-in' : 'Check In'}</h3>
 				<button
 					on:click={close}
 					class="text-gray-400 hover:text-gray-500 focus:outline-none"
@@ -104,7 +123,7 @@
 
 			{#if success}
 				<div class="mb-4 p-3 bg-green-50 border-l-4 border-green-400 text-green-700 text-sm">
-					Check-in created successfully!
+					Check-in {mode === 'edit' ? 'updated' : 'created'} successfully!
 				</div>
 			{/if}
 
@@ -215,7 +234,7 @@
 						</svg>
 						Saving...
 					{:else}
-						Check In
+						{mode === 'edit' ? 'Save Changes' : 'Check In'}
 					{/if}
 				</button>
 			</div>
