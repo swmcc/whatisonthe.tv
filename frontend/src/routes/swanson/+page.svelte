@@ -6,6 +6,34 @@
 	import { auth } from '$lib/stores/auth';
 	import { swansonLoading, swansonStreamingText, swansonMessages, resetSwansonStores } from '$lib/stores/swanson';
 
+	// Simple streaming-safe markdown renderer
+	function renderMarkdown(text: string): string {
+		let html = text
+			// Escape HTML first
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			// Bold: **text** - only match complete pairs
+			.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+			// Italic: *text* - only match complete pairs (but not inside bold)
+			.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
+			// Bullet points: lines starting with -
+			.replace(/^- (.+)$/gm, '<li>$1</li>')
+			// Wrap consecutive <li> in <ul>
+			.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+			// Double newlines = paragraph break
+			.replace(/\n\n/g, '</p><p>')
+			// Single newlines = line break
+			.replace(/\n/g, '<br>');
+
+		// Wrap in paragraph tags
+		html = '<p>' + html + '</p>';
+		// Clean up empty paragraphs
+		html = html.replace(/<p><\/p>/g, '');
+
+		return html;
+	}
+
 	let chatBottom: HTMLDivElement;
 
 	function scrollToBottom() {
@@ -209,6 +237,53 @@
 	.swanson-spin {
 		animation: spin-slow 2s linear infinite;
 	}
+
+	/* Markdown prose styles */
+	.prose :global(p) {
+		margin-bottom: 0.75rem;
+	}
+	.prose :global(p:last-child) {
+		margin-bottom: 0;
+	}
+	.prose :global(ul) {
+		list-style-type: disc !important;
+		margin: 0.75rem 0 !important;
+		padding-left: 1.5rem !important;
+	}
+	.prose :global(ol) {
+		list-style-type: decimal !important;
+		margin: 0.75rem 0 !important;
+		padding-left: 1.5rem !important;
+	}
+	.prose :global(li) {
+		margin-bottom: 0.375rem !important;
+		display: list-item !important;
+	}
+	.prose :global(li p) {
+		margin-bottom: 0;
+	}
+	.prose :global(strong) {
+		font-weight: 600;
+	}
+	.prose :global(em) {
+		font-style: italic;
+	}
+	.prose :global(h1), .prose :global(h2), .prose :global(h3) {
+		font-weight: 600;
+		margin-top: 1rem;
+		margin-bottom: 0.5rem;
+	}
+	.prose :global(br) {
+		display: block;
+		content: "";
+		margin-top: 0.5rem;
+	}
+	.prose :global(code) {
+		background-color: #f3f4f6;
+		padding: 0.125rem 0.25rem;
+		border-radius: 0.25rem;
+		font-size: 0.875em;
+	}
 </style>
 
 <!-- Sub-header with context -->
@@ -276,7 +351,11 @@
 								? 'bg-indigo-600 text-white rounded-br-md'
 								: 'bg-white shadow-sm border border-gray-100 rounded-bl-md'}"
 						>
-							<p class="whitespace-pre-wrap">{message.content}</p>
+							{#if message.role === 'swanson'}
+								<div class="prose prose-sm max-w-none">{@html renderMarkdown(message.content)}</div>
+							{:else}
+								<p class="whitespace-pre-wrap">{message.content}</p>
+							{/if}
 						</div>
 					</div>
 				</div>
@@ -294,7 +373,7 @@
 					<div class="flex-1">
 						<div class="inline-block px-4 py-3 bg-white shadow-sm border border-gray-100 rounded-2xl rounded-bl-md max-w-xl">
 							{#if $swansonStreamingText}
-								<p class="whitespace-pre-wrap">{$swansonStreamingText}<span class="animate-pulse">▊</span></p>
+								<div class="prose prose-sm max-w-none">{@html renderMarkdown($swansonStreamingText)}<span class="animate-pulse">▊</span></div>
 							{:else}
 								<p class="text-gray-600 italic">"{currentQuote}"</p>
 								<p class="text-xs text-gray-400 mt-2">- Ron Swanson</p>

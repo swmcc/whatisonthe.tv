@@ -294,7 +294,12 @@ export const api = {
 							console.log('[API] Received error:', content);
 							throw new Error(content.slice(8));
 						}
-						yield content;
+						// Parse JSON to handle newlines properly
+						try {
+							yield JSON.parse(content);
+						} catch {
+							yield content;
+						}
 					}
 				}
 			}

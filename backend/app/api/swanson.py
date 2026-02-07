@@ -1,5 +1,7 @@
 """Swanson AI recommendation API endpoints."""
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
@@ -29,6 +31,11 @@ Guidelines:
 - If the search results are provided, prioritize those but feel free to suggest others
 - If the user hasn't watched much, acknowledge that and give broader suggestions
 - Keep responses concise - around 100-150 words max
+
+Format your response using markdown:
+- Always wrap show/movie titles in double asterisks for bold: **Title Here**
+- Use a blank line between paragraphs
+- Start each recommendation on a new line with a bullet point: - **Title** - Description
 
 User's viewing history and preferences will be provided as context.
 """
@@ -229,8 +236,8 @@ async def get_recommendation_stream(
         async def generate():
             try:
                 async for chunk in llm.stream(SYSTEM_PROMPT, user_prompt):
-                    # SSE format: data: <content>\n\n
-                    yield f"data: {chunk}\n\n"
+                    # SSE format: data: <json>\n\n - JSON encode to handle newlines
+                    yield f"data: {json.dumps(chunk)}\n\n"
                 yield "data: [DONE]\n\n"
             except Exception as e:
                 yield f"data: [ERROR] {str(e)}\n\n"
