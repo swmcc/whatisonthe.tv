@@ -5,7 +5,6 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth';
 	import { api } from '$lib/api';
-	import SwansonWidget from '$lib/components/SwansonWidget.svelte';
 
 	let menuOpen = false;
 
@@ -262,7 +261,5 @@
 			</div>
 		</footer>
 
-		<!-- Swanson AI Assistant -->
-		<SwansonWidget />
 	</div>
 {/if}
