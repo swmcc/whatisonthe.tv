@@ -1,7 +1,7 @@
 """LLM abstraction layer for AI-powered recommendations."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 from app.core.config import settings
 
@@ -11,15 +11,12 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def complete(self, system_prompt: str, user_prompt: str) -> str:
-        """Generate a completion from the LLM.
+        """Generate a completion from the LLM."""
+        pass
 
-        Args:
-            system_prompt: The system/context prompt.
-            user_prompt: The user's message.
-
-        Returns:
-            The LLM's response text.
-        """
+    @abstractmethod
+    async def stream(self, system_prompt: str, user_prompt: str) -> AsyncIterator[str]:
+        """Stream a completion from the LLM, yielding text chunks."""
         pass
 
 
@@ -35,7 +32,6 @@ class AnthropicProvider(LLMProvider):
     def client(self) -> "anthropic.AsyncAnthropic":
         if self._client is None:
             import anthropic
-
             self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
         return self._client
 
@@ -47,6 +43,16 @@ class AnthropicProvider(LLMProvider):
             messages=[{"role": "user", "content": user_prompt}],
         )
         return message.content[0].text
+
+    async def stream(self, system_prompt: str, user_prompt: str) -> AsyncIterator[str]:
+        async with self.client.messages.stream(
+            model=self.model,
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
 
 
 class OpenAIProvider(LLMProvider):
@@ -61,7 +67,6 @@ class OpenAIProvider(LLMProvider):
     def client(self) -> "openai.AsyncOpenAI":
         if self._client is None:
             import openai
-
             self._client = openai.AsyncOpenAI(api_key=self.api_key)
         return self._client
 
@@ -76,16 +81,23 @@ class OpenAIProvider(LLMProvider):
         )
         return response.choices[0].message.content or ""
 
+    async def stream(self, system_prompt: str, user_prompt: str) -> AsyncIterator[str]:
+        stream = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=1024,
+            stream=True,
+        )
+        async for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
 
 def get_llm_provider() -> LLMProvider:
-    """Get the configured LLM provider.
-
-    Returns:
-        An LLM provider instance based on settings.
-
-    Raises:
-        ValueError: If no API key is configured for the selected provider.
-    """
+    """Get the configured LLM provider."""
     if settings.llm_provider == "anthropic":
         if not settings.anthropic_api_key:
             raise ValueError("ANTHROPIC_API_KEY is not configured")

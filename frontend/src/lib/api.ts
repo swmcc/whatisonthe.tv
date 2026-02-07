@@ -223,6 +223,81 @@ export const api = {
 				body: JSON.stringify(data),
 				requiresAuth: true
 			});
+		},
+		// Streaming version - returns an async iterator of text chunks
+		stream: async function* (data: {
+			prompt: string;
+			search_results: Array<{
+				id: number;
+				name: string;
+				type: string;
+				year?: number;
+				genres?: string[];
+			}>;
+		}): AsyncGenerator<string, void, unknown> {
+			console.log('[API] stream() called with prompt:', data.prompt.substring(0, 50));
+			const authState = get(auth);
+
+			if (!authState.token || isTokenExpired(authState.token)) {
+				console.log('[API] Token expired or missing');
+				auth.handleAuthError();
+				if (browser) {
+					goto('/login');
+				}
+				throw new AuthenticationError();
+			}
+
+			console.log('[API] Fetching stream from:', `${API_URL}/swanson/recommend/stream`);
+			const response = await fetch(`${API_URL}/swanson/recommend/stream`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${authState.token}`
+				},
+				body: JSON.stringify(data)
+			});
+
+			console.log('[API] Response status:', response.status);
+			if (!response.ok) {
+				const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
+				console.log('[API] Error response:', error);
+				throw new Error(error.detail || `HTTP error ${response.status}`);
+			}
+
+			const reader = response.body?.getReader();
+			if (!reader) throw new Error('No response body');
+
+			const decoder = new TextDecoder();
+			let buffer = '';
+
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) {
+					console.log('[API] Stream done, remaining buffer:', buffer);
+					break;
+				}
+
+				buffer += decoder.decode(value, { stream: true });
+
+				// Parse SSE format: "data: <content>\n\n"
+				const lines = buffer.split('\n\n');
+				buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+				for (const line of lines) {
+					if (line.startsWith('data: ')) {
+						const content = line.slice(6);
+						if (content === '[DONE]') {
+							console.log('[API] Received [DONE]');
+							return;
+						}
+						if (content.startsWith('[ERROR]')) {
+							console.log('[API] Received error:', content);
+							throw new Error(content.slice(8));
+						}
+						yield content;
+					}
+				}
+			}
 		}
 	}
 };

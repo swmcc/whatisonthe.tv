@@ -33,3 +33,4 @@ tvdb_v4_official==1.1.0
 # Task queue
 celery==5.3.6
 flower==2.0.1
+anthropic
