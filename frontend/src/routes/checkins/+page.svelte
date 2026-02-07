@@ -531,6 +531,7 @@
 {#if showSwansonModal}
 	<SwansonModal
 		checkins={filteredCheckins}
+		filterInfo={{ startDate: startDateFilter, endDate: endDateFilter }}
 		testMode={true}
 		on:close={() => showSwansonModal = false}
 	/>

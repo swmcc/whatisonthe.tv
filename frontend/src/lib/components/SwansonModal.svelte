@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { api } from '$lib/api';
 
 	const dispatch = createEventDispatcher();
 
 	export let checkins: any[] = [];
+	export let filterInfo: { startDate: string; endDate: string } | null = null;
 	export let testMode = false; // Set to true to test loading state without API call
 
 	// Ron Swanson quotes for the loading state
@@ -28,7 +31,6 @@
 
 	let userPrompt = '';
 	let loading = false;
-	let response = '';
 	let error = '';
 	let currentQuote = '';
 	let quoteInterval: ReturnType<typeof setInterval>;
@@ -69,10 +71,12 @@
 		startLoadingAnimation();
 
 		try {
+			let aiResponse: string;
+
 			if (testMode) {
-				// Test mode - just wait 5 seconds to see the loading state
-				await new Promise(resolve => setTimeout(resolve, 5000));
-				response = "This is a test response. In production, Swanson would give you real recommendations based on your viewing history.";
+				// Test mode - just wait 3 seconds to see the loading state
+				await new Promise(resolve => setTimeout(resolve, 3000));
+				aiResponse = "Based on your viewing history, I'd recommend checking out some quality television. You seem to appreciate shows with strong characters and good storytelling.";
 			} else {
 				// Real API call
 				const searchResults = checkins.map(checkin => ({
@@ -87,11 +91,24 @@
 					prompt: userPrompt,
 					search_results: searchResults
 				});
-				response = result.recommendation;
+				aiResponse = result.recommendation;
 			}
+
+			// Store context and navigate to Swanson page
+			if (browser) {
+				sessionStorage.setItem('swanson_checkins', JSON.stringify(checkins));
+				sessionStorage.setItem('swanson_filter', JSON.stringify(filterInfo || {}));
+				sessionStorage.setItem('swanson_messages', JSON.stringify([
+					{ role: 'user', content: userPrompt },
+					{ role: 'swanson', content: aiResponse }
+				]));
+			}
+
+			// Navigate to Swanson chat page
+			goto('/swanson');
+
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to get recommendation';
-		} finally {
 			loading = false;
 			stopLoadingAnimation();
 		}
@@ -111,12 +128,6 @@
 		if (!loading) {
 			dispatch('close');
 		}
-	}
-
-	function reset() {
-		response = '';
-		error = '';
-		userPrompt = '';
 	}
 </script>
 
@@ -207,28 +218,6 @@
 					</p>
 					<p class="text-xs text-gray-400 mt-4">- Ron Swanson</p>
 				</div>
-			{:else if response}
-				<!-- Response -->
-				<div class="space-y-4">
-					<div class="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto">
-						<p class="text-gray-800 whitespace-pre-wrap">{response}</p>
-					</div>
-
-					<div class="flex gap-3">
-						<button
-							on:click={reset}
-							class="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-						>
-							Ask Another
-						</button>
-						<button
-							on:click={close}
-							class="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
-						>
-							Done
-						</button>
-					</div>
-				</div>
 			{:else}
 				<!-- Input State -->
 				<div class="space-y-4">
@@ -262,7 +251,7 @@
 
 					{#if testMode}
 						<p class="text-xs text-center text-amber-600">
-							Test mode enabled - will simulate 5 second delay
+							Test mode - will simulate delay then navigate
 						</p>
 					{/if}
 				</div>
