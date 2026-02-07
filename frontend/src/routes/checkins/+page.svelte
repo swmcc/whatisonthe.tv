@@ -6,6 +6,18 @@
 	import DateFilter from '$lib/components/DateFilter.svelte';
 	import CheckInModal from '$lib/components/CheckInModal.svelte';
 
+	let checkins: any[] = [];
+	let loading = true;
+	let loadingMore = false;
+	let error = '';
+	let hasMore = true;
+	let oldestDate: string | null = null;
+	let searchQuery = '';
+	let startDateFilter = '';
+	let endDateFilter = '';
+	let showEditModal = false;
+	let editingCheckin: any = null;
+
 	// Swanson is only available when a date filter is applied
 	$: showSwanson = startDateFilter !== '' || endDateFilter !== '';
 
@@ -24,18 +36,6 @@
 
 		goto('/swanson');
 	}
-
-	let checkins: any[] = [];
-	let loading = true;
-	let loadingMore = false;
-	let error = '';
-	let hasMore = true;
-	let oldestDate: string | null = null;
-	let searchQuery = '';
-	let startDateFilter = '';
-	let endDateFilter = '';
-	let showEditModal = false;
-	let editingCheckin: any = null;
 
 	// Filter checkins based on search query and date range
 	$: filteredCheckins = checkins.filter((checkin) => {
