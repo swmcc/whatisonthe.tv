@@ -4,7 +4,7 @@
 	import { browser } from '$app/environment';
 	import { api } from '$lib/api';
 	import { auth } from '$lib/stores/auth';
-	import { swansonLoading, swansonStreamingText, swansonMessages, resetSwansonStores } from '$lib/stores/swanson';
+	import { swansonLoading, swansonStreamingText, swansonMessages, resetSwansonStores, parseTitles, type SearchResult } from '$lib/stores/swanson';
 
 	// Simple streaming-safe markdown renderer
 	function renderMarkdown(text: string): string {
@@ -167,6 +167,33 @@
 		if (quoteInterval) clearInterval(quoteInterval);
 	}
 
+	async function searchForTitles(titles: string[]): Promise<SearchResult[]> {
+		const results: SearchResult[] = [];
+		const seen = new Set<number>();
+
+		for (const title of titles.slice(0, 5)) {
+			try {
+				const searchResponse = await api.search.query(title, 1);
+				if (searchResponse.results && searchResponse.results.length > 0) {
+					const item = searchResponse.results[0];
+					if (item.id && !seen.has(item.id)) {
+						seen.add(item.id);
+						results.push({
+							id: item.id,
+							name: item.name,
+							type: item.type,
+							year: item.year ? parseInt(item.year) : undefined,
+							image: item.image_url
+						});
+					}
+				}
+			} catch (e) {
+				console.error('Failed to search for:', title, e);
+			}
+		}
+		return results;
+	}
+
 	async function streamResponse(prompt: string) {
 		swansonMessages.update(msgs => [...msgs, { role: 'user', content: prompt }]);
 		swansonLoading.set(true);
@@ -183,7 +210,18 @@
 				swansonStreamingText.set(accumulated);
 			}
 
-			swansonMessages.update(msgs => [...msgs, { role: 'swanson', content: accumulated }]);
+			// Parse titles and search for recommendations
+			const { cleanContent, titles } = parseTitles(accumulated);
+			let recommendations: SearchResult[] = [];
+			if (titles.length > 0) {
+				recommendations = await searchForTitles(titles);
+			}
+
+			swansonMessages.update(msgs => [...msgs, {
+				role: 'swanson',
+				content: cleanContent,
+				recommendations
+			}]);
 			swansonStreamingText.set('');
 		} catch (err) {
 			swansonMessages.update(msgs => [...msgs, {
@@ -357,6 +395,35 @@
 								<p class="whitespace-pre-wrap">{message.content}</p>
 							{/if}
 						</div>
+
+						{#if message.role === 'swanson' && message.recommendations && message.recommendations.length > 0}
+							<div class="mt-4 flex flex-wrap gap-3">
+								{#each message.recommendations as rec}
+									<a
+										href="/show/{rec.id}{rec.type === 'movie' ? '?type=movie' : ''}"
+										class="group flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 transition-all"
+									>
+										{#if rec.image}
+											<img
+												src={rec.image}
+												alt={rec.name}
+												class="w-10 h-14 rounded-md object-cover shadow-sm"
+											/>
+										{:else}
+											<div class="w-10 h-14 rounded-md bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center shadow-sm">
+												<svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+												</svg>
+											</div>
+										{/if}
+										<div class="min-w-0">
+											<p class="text-sm font-medium text-gray-900 group-hover:text-indigo-600 truncate max-w-[140px]">{rec.name}</p>
+											<p class="text-xs text-gray-500">{rec.type === 'movie' ? 'Movie' : 'Series'}{rec.year ? ` · ${rec.year}` : ''}</p>
+										</div>
+									</a>
+								{/each}
+							</div>
+						{/if}
 					</div>
 				</div>
 			{/each}
