@@ -4,7 +4,7 @@
 	import { browser } from '$app/environment';
 	import { api } from '$lib/api';
 
-	// Ron Swanson quotes for the loading state
+	// Ron Swanson quotes
 	const SWANSON_QUOTES = [
 		"Never half-ass two things. Whole-ass one thing.",
 		"Give a man a fish and feed him for a day. Don't teach a man to fish... and feed yourself. He's a grown man. Fishing's not that hard.",
@@ -12,52 +12,59 @@
 		"Crying: acceptable at funerals and the Grand Canyon.",
 		"Clear alcohols are for rich women on diets.",
 		"I'm a simple man. I like pretty, dark-haired women and breakfast food.",
-		"Any dog under 50 pounds is a cat and cats are useless.",
-		"History began July 4th, 1776. Everything before that was a mistake.",
-		"There is only one bad word: taxes.",
-		"I'd wish you the best of luck but I believe luck is a concept created by the weak to explain their failures.",
-		"The less I know about other people's affairs, the happier I am.",
-		"When people get too chummy with me, I like to call them by the wrong name to let them know I don't really care about them.",
-		"I once worked with a guy for three years and never learned his name. Best friend I ever had.",
 		"Just give me all the bacon and eggs you have.",
 		"Fishing relaxes me. It's like yoga, except I still get to kill something."
 	];
 
-	let userPrompt = '';
+	interface Message {
+		role: 'user' | 'swanson';
+		content: string;
+	}
+
+	let messages: Message[] = [];
+	let userInput = '';
 	let loading = false;
-	let response = '';
-	let error = '';
 	let currentQuote = '';
 	let quoteInterval: ReturnType<typeof setInterval>;
-	let checkinData: any[] = [];
-	let hasDateFilter = false;
+	let checkins: any[] = [];
+	let filterInfo: { startDate: string; endDate: string } | null = null;
+	let testMode = true; // Set to false for real API calls
 
 	onMount(() => {
-		// Get checkin data from sessionStorage
 		if (browser) {
-			const stored = sessionStorage.getItem('swanson_checkins');
-			const filterInfo = sessionStorage.getItem('swanson_filter');
+			// Get context from sessionStorage
+			const storedCheckins = sessionStorage.getItem('swanson_checkins');
+			const storedFilter = sessionStorage.getItem('swanson_filter');
+			const storedMessages = sessionStorage.getItem('swanson_messages');
 
-			if (stored) {
-				checkinData = JSON.parse(stored);
+			if (storedCheckins) {
+				checkins = JSON.parse(storedCheckins);
 			}
-			if (filterInfo) {
-				hasDateFilter = JSON.parse(filterInfo).hasDateFilter;
+			if (storedFilter) {
+				filterInfo = JSON.parse(storedFilter);
+			}
+			if (storedMessages) {
+				messages = JSON.parse(storedMessages);
 			}
 
-			// If no date filter, redirect back with message
-			if (!hasDateFilter) {
-				error = "That's too much data. Please filter your checkins by date first.";
+			// If no context, redirect back
+			if (checkins.length === 0) {
+				goto('/checkins');
+				return;
 			}
 		}
 
-		// Set initial quote
 		currentQuote = getRandomQuote();
 
 		return () => {
 			if (quoteInterval) clearInterval(quoteInterval);
 		};
 	});
+
+	// Persist messages to sessionStorage
+	$: if (browser && messages.length > 0) {
+		sessionStorage.setItem('swanson_messages', JSON.stringify(messages));
+	}
 
 	function getRandomQuote(): string {
 		return SWANSON_QUOTES[Math.floor(Math.random() * SWANSON_QUOTES.length)];
@@ -67,44 +74,53 @@
 		currentQuote = getRandomQuote();
 		quoteInterval = setInterval(() => {
 			currentQuote = getRandomQuote();
-		}, 4000);
+		}, 3000);
 	}
 
 	function stopQuoteRotation() {
-		if (quoteInterval) {
-			clearInterval(quoteInterval);
-		}
+		if (quoteInterval) clearInterval(quoteInterval);
 	}
 
-	async function handleSubmit() {
-		if (!userPrompt.trim()) return;
-		if (!hasDateFilter) {
-			error = "That's too much data. Please filter your checkins by date first.";
-			return;
-		}
+	async function sendMessage() {
+		if (!userInput.trim() || loading) return;
+
+		const userMessage = userInput.trim();
+		userInput = '';
+
+		// Add user message
+		messages = [...messages, { role: 'user', content: userMessage }];
 
 		loading = true;
-		error = '';
-		response = '';
 		startQuoteRotation();
 
 		try {
-			// Transform checkin data to search results format
-			const searchResults = checkinData.map(checkin => ({
-				id: checkin.content?.tvdb_id || checkin.content?.id,
-				name: checkin.content?.name || 'Unknown',
-				type: checkin.content?.content_type || 'unknown',
-				year: checkin.content?.year,
-				genres: [] // Could be populated if available
-			}));
+			let response: string;
 
-			const result = await api.swanson.recommend({
-				prompt: userPrompt,
-				search_results: searchResults
-			});
-			response = result.recommendation;
+			if (testMode) {
+				await new Promise(resolve => setTimeout(resolve, 3000));
+				response = `Based on your viewing history, I'd recommend checking out some quality television. You seem to appreciate shows with strong characters and good storytelling. Here are my thoughts on "${userMessage}":\n\n1. Consider rewatching something you loved\n2. Try something completely different\n3. When in doubt, watch Parks and Recreation`;
+			} else {
+				const searchResults = checkins.map(checkin => ({
+					id: checkin.content?.tvdb_id || checkin.content?.id,
+					name: checkin.content?.name || 'Unknown',
+					type: checkin.content?.content_type || 'unknown',
+					year: checkin.content?.year,
+					genres: []
+				}));
+
+				const result = await api.swanson.recommend({
+					prompt: userMessage,
+					search_results: searchResults
+				});
+				response = result.recommendation;
+			}
+
+			messages = [...messages, { role: 'swanson', content: response }];
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to get recommendation';
+			messages = [...messages, {
+				role: 'swanson',
+				content: `Something went wrong. ${err instanceof Error ? err.message : 'Try again.'}`
+			}];
 		} finally {
 			loading = false;
 			stopQuoteRotation();
@@ -114,165 +130,178 @@
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
-			handleSubmit();
+			sendMessage();
 		}
 	}
 
 	function goBack() {
+		// Clear swanson session data
+		if (browser) {
+			sessionStorage.removeItem('swanson_messages');
+		}
 		goto('/checkins');
+	}
+
+	function formatDateRange(): string {
+		if (!filterInfo) return '';
+		const start = new Date(filterInfo.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+		const end = new Date(filterInfo.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+		return `${start} - ${end}`;
 	}
 </script>
 
-<div class="min-h-screen bg-gray-50 py-12">
-	<div class="max-w-2xl mx-auto px-4">
-		<!-- Header with back button -->
-		<div class="mb-8">
-			<button
-				on:click={goBack}
-				class="text-gray-600 hover:text-gray-900 flex items-center gap-2 mb-4"
-			>
-				<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-				</svg>
-				Back to Check-ins
-			</button>
+<div class="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
+	<!-- Header -->
+	<div class="bg-white border-b border-gray-200 sticky top-0 z-10">
+		<div class="max-w-3xl mx-auto px-4 py-3">
+			<div class="flex items-center justify-between">
+				<button
+					on:click={goBack}
+					class="text-gray-600 hover:text-gray-900 flex items-center gap-2 text-sm"
+				>
+					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+					</svg>
+					Back to Check-ins
+				</button>
+				<div class="flex items-center gap-2 text-sm text-gray-500">
+					<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-medium">
+						{checkins.length} check-ins
+					</span>
+					{#if filterInfo}
+						<span class="text-gray-400">|</span>
+						<span>{formatDateRange()}</span>
+					{/if}
+				</div>
+			</div>
 		</div>
+	</div>
 
-		<!-- Swanson Card -->
-		<div class="bg-white rounded-2xl shadow-xl overflow-hidden">
-			<!-- Header with large Swanson image -->
-			<div class="bg-gradient-to-r from-indigo-600 to-indigo-800 px-8 py-6">
-				<div class="flex items-center gap-6">
+	<!-- Chat Area -->
+	<div class="max-w-3xl mx-auto px-4 py-6">
+		<!-- Messages -->
+		<div class="space-y-6 mb-32">
+			{#if messages.length === 0}
+				<!-- Empty state -->
+				<div class="text-center py-12">
 					<img
 						src="/swanson.png"
 						alt="Swanson"
-						class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+						class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-indigo-200"
 					/>
-					<div>
-						<h1 class="text-2xl font-bold text-white">Swanson</h1>
-						<p class="text-indigo-200">Your no-nonsense recommendation assistant</p>
-					</div>
+					<h1 class="text-2xl font-bold text-gray-900 mb-2">Ask Swanson</h1>
+					<p class="text-gray-600 max-w-md mx-auto">
+						Based on your {checkins.length} check-ins, I'll give you straight-forward recommendations. No nonsense.
+					</p>
 				</div>
-			</div>
+			{/if}
 
-			<!-- Body -->
-			<div class="p-8">
-				{#if error && !hasDateFilter}
-					<!-- All-time error -->
-					<div class="text-center py-8">
-						<div class="mb-6">
+			{#each messages as message}
+				<div class="flex gap-4 {message.role === 'user' ? 'flex-row-reverse' : ''}">
+					<!-- Avatar -->
+					<div class="flex-shrink-0">
+						{#if message.role === 'swanson'}
 							<img
 								src="/swanson.png"
 								alt="Swanson"
-								class="w-20 h-20 rounded-full mx-auto opacity-50"
+								class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200"
 							/>
-						</div>
-						<p class="text-lg text-gray-700 font-medium mb-4">"{error}"</p>
-						<p class="text-gray-500 mb-6">Select a date range on the check-ins page first.</p>
-						<button
-							on:click={goBack}
-							class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-						>
-							Go Back
-						</button>
-					</div>
-				{:else if loading}
-					<!-- Loading state with rotating quotes -->
-					<div class="text-center py-8">
-						<div class="mb-6">
-							<img
-								src="/swanson.png"
-								alt="Swanson thinking"
-								class="w-20 h-20 rounded-full mx-auto animate-pulse"
-							/>
-						</div>
-						<div class="mb-4">
-							<svg
-								class="animate-spin h-8 w-8 text-indigo-600 mx-auto"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-							>
-								<circle
-									class="opacity-25"
-									cx="12"
-									cy="12"
-									r="10"
-									stroke="currentColor"
-									stroke-width="4"
-								/>
-								<path
-									class="opacity-75"
-									fill="currentColor"
-									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-								/>
-							</svg>
-						</div>
-						<p class="text-lg text-gray-700 italic max-w-md mx-auto">
-							"{currentQuote}"
-						</p>
-					</div>
-				{:else if response}
-					<!-- Response -->
-					<div class="space-y-6">
-						<div class="bg-gray-50 rounded-lg p-6">
-							<p class="text-gray-800 whitespace-pre-wrap">{response}</p>
-						</div>
-
-						<div class="border-t pt-6">
-							<p class="text-sm text-gray-500 mb-4">Ask another question:</p>
-							<div class="flex gap-3">
-								<input
-									type="text"
-									bind:value={userPrompt}
-									on:keydown={handleKeydown}
-									placeholder="What else are you in the mood for?"
-									class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-								/>
-								<button
-									on:click={handleSubmit}
-									disabled={!userPrompt.trim()}
-									class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-								>
-									Ask
-								</button>
-							</div>
-						</div>
-					</div>
-				{:else}
-					<!-- Initial state -->
-					<div class="space-y-6">
-						{#if error}
-							<div class="p-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded">
-								{error}
+						{:else}
+							<div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
+								<svg class="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+								</svg>
 							</div>
 						{/if}
-
-						<div class="text-center mb-6">
-							<p class="text-gray-600">
-								Based on your <strong>{checkinData.length}</strong> filtered check-ins,
-								what are you in the mood for?
-							</p>
-						</div>
-
-						<textarea
-							bind:value={userPrompt}
-							on:keydown={handleKeydown}
-							placeholder="I'm looking for something like Breaking Bad but funnier..."
-							rows="4"
-							class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-						/>
-
-						<button
-							on:click={handleSubmit}
-							disabled={!userPrompt.trim()}
-							class="w-full px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-						>
-							Ask Swanson
-						</button>
 					</div>
-				{/if}
+
+					<!-- Message -->
+					<div class="flex-1 max-w-xl {message.role === 'user' ? 'text-right' : ''}">
+						<div
+							class="inline-block px-4 py-3 rounded-2xl {message.role === 'user'
+								? 'bg-indigo-600 text-white rounded-br-md'
+								: 'bg-white shadow-sm border border-gray-100 rounded-bl-md'}"
+						>
+							<p class="whitespace-pre-wrap">{message.content}</p>
+						</div>
+					</div>
+				</div>
+			{/each}
+
+			{#if loading}
+				<!-- Loading message -->
+				<div class="flex gap-4">
+					<div class="flex-shrink-0">
+						<img
+							src="/swanson.png"
+							alt="Swanson"
+							class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200 animate-pulse"
+						/>
+					</div>
+					<div class="flex-1">
+						<div class="inline-block px-4 py-3 bg-white shadow-sm border border-gray-100 rounded-2xl rounded-bl-md">
+							<p class="text-gray-600 italic">"{currentQuote}"</p>
+							<div class="flex items-center gap-2 mt-2">
+								<div class="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+								<div class="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+								<div class="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Input Bar (fixed at bottom) -->
+	<div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
+		<div class="max-w-3xl mx-auto">
+			<div class="flex gap-3 items-end">
+				<!-- Swanson icon instead of magnifying glass -->
+				<div class="flex-shrink-0 pb-2">
+					<img
+						src="/swanson.png"
+						alt="Swanson"
+						class="w-10 h-10 rounded-full object-cover border-2 border-indigo-300"
+					/>
+				</div>
+
+				<!-- Input -->
+				<div class="flex-1 relative">
+					<textarea
+						bind:value={userInput}
+						on:keydown={handleKeydown}
+						placeholder="Ask me anything about what to watch..."
+						rows="1"
+						disabled={loading}
+						class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
+					/>
+				</div>
+
+				<!-- Send button -->
+				<button
+					on:click={sendMessage}
+					disabled={!userInput.trim() || loading}
+					class="flex-shrink-0 p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+				>
+					{#if loading}
+						<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+						</svg>
+					{:else}
+						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+						</svg>
+					{/if}
+				</button>
 			</div>
+
+			{#if testMode}
+				<p class="text-xs text-center text-amber-600 mt-2">
+					Test mode - responses are simulated
+				</p>
+			{/if}
 		</div>
 	</div>
 </div>
