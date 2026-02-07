@@ -397,28 +397,28 @@
 						</div>
 
 						{#if message.role === 'swanson' && message.recommendations && message.recommendations.length > 0}
-							<div class="mt-4 flex flex-wrap gap-3">
+							<div class="mt-4 flex flex-wrap gap-4">
 								{#each message.recommendations as rec}
 									<a
 										href="/show/{rec.id}{rec.type === 'movie' ? '?type=movie' : ''}"
-										class="group flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 transition-all"
+										class="group flex items-center gap-4 px-4 py-3 rounded-2xl bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 shadow-sm hover:shadow-md transition-all"
 									>
 										{#if rec.image}
 											<img
 												src={rec.image}
 												alt={rec.name}
-												class="w-10 h-14 rounded-md object-cover shadow-sm"
+												class="w-14 h-20 rounded-lg object-cover shadow-sm"
 											/>
 										{:else}
-											<div class="w-10 h-14 rounded-md bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center shadow-sm">
-												<svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<div class="w-14 h-20 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center shadow-sm">
+												<svg class="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
 												</svg>
 											</div>
 										{/if}
 										<div class="min-w-0">
-											<p class="text-sm font-medium text-gray-900 group-hover:text-indigo-600 truncate max-w-[140px]">{rec.name}</p>
-											<p class="text-xs text-gray-500">{rec.type === 'movie' ? 'Movie' : 'Series'}{rec.year ? ` · ${rec.year}` : ''}</p>
+											<p class="text-base font-medium text-gray-900 group-hover:text-indigo-600 truncate max-w-[180px]">{rec.name}</p>
+											<p class="text-sm text-gray-500">{rec.type === 'movie' ? 'Movie' : 'Series'}{rec.year ? ` · ${rec.year}` : ''}</p>
 										</div>
 									</a>
 								{/each}
