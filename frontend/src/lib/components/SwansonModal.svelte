@@ -8,9 +8,9 @@
 
 	export let checkins: any[] = [];
 	export let filterInfo: { startDate: string; endDate: string } | null = null;
-	export let testMode = false; // Set to true to test loading state without API call
+	export let testMode = false;
 
-	// Ron Swanson quotes for the loading state
+	// 50 Ron Swanson quotes
 	const SWANSON_QUOTES = [
 		"Never half-ass two things. Whole-ass one thing.",
 		"Give a man a fish and feed him for a day. Don't teach a man to fish... and feed yourself. He's a grown man. Fishing's not that hard.",
@@ -26,7 +26,42 @@
 		"When people get too chummy with me, I like to call them by the wrong name to let them know I don't really care about them.",
 		"I once worked with a guy for three years and never learned his name. Best friend I ever had.",
 		"Just give me all the bacon and eggs you have.",
-		"Fishing relaxes me. It's like yoga, except I still get to kill something."
+		"Fishing relaxes me. It's like yoga, except I still get to kill something.",
+		"I like saying 'No.' It lowers their enthusiasm.",
+		"Capitalism: God's way of determining who is smart and who is poor.",
+		"I'm not interested in caring about people.",
+		"There are only three ways to motivate people: money, fear, and hunger.",
+		"Keep your tears in your eyes where they belong.",
+		"Normally, if given a choice between doing something and nothing, I'd choose to do nothing. But I will do something if it helps someone else do nothing.",
+		"I have cried twice in my life. Once when I was seven and hit by a school bus. And then again when I heard that Li'l Sebastian had passed.",
+		"People who buy things are suckers.",
+		"Honor. If you don't know what it is, I'm not going to explain it.",
+		"Friends: one to three is sufficient.",
+		"When I eat, it is the food that is scared.",
+		"Breakfast food can serve many purposes.",
+		"I don't want to paint with a broad brush here, but every single contractor in the world is a criminal.",
+		"Great job, everyone. The reception will be held in each of our individual houses, alone.",
+		"There has never been a sadness that can't be cured by breakfast food.",
+		"I am not a sore loser. It's just that I prefer to win and when I don't, I get furious.",
+		"Turkey can never beat cow.",
+		"Please and thank you. That's how it's done.",
+		"I call this turf 'n' turf. It's a 16-oz T-bone and a 24-oz porterhouse.",
+		"On my deathbed, my final wish is to have my ex-wives rush to my side so I can use my dying breath to tell them both to go to hell one last time.",
+		"Under my tutelage, you will grow from boys to men. From men into gladiators. And from gladiators into Swansons.",
+		"I suffer from a condition called 'caring too little.'",
+		"I don't drink alcohol from feminine containers. Glass? Plastic? Lady glass.",
+		"You had me at 'Meat Tornado.'",
+		"Put some alcohol in your mouth to block the words from coming out.",
+		"I'm a man of simple pleasures. Give me a well-cooked steak, a glass of whiskey, and a room full of people I can ignore.",
+		"The only things I care about are golf, meat, and my relationships with my female companions.",
+		"I've said too much. Any more details and I might have feelings.",
+		"If there were more food and fewer people, this would be a perfect party.",
+		"Everything hurts. Running is impossible.",
+		"No home is complete without a proper toolbox. Fill yours with items you'll actually use.",
+		"I like Tom. He doesn't do a lot of work around here. He shows zero initiative. He's not a team player. He's never wanted to go that extra mile. Tom is exactly what I'm looking for in a government employee.",
+		"I know what I'm about, son.",
+		"Cultivate relationships. But not too many.",
+		"Live your life how you want, but don't confuse drama with happiness."
 	];
 
 	let userPrompt = '';
@@ -34,8 +69,6 @@
 	let error = '';
 	let currentQuote = '';
 	let quoteInterval: ReturnType<typeof setInterval>;
-	let spinAngle = 0;
-	let spinInterval: ReturnType<typeof setInterval>;
 
 	// Initialize with a random quote
 	currentQuote = getRandomQuote();
@@ -46,20 +79,14 @@
 
 	function startLoadingAnimation() {
 		currentQuote = getRandomQuote();
-		// Rotate quotes every 3 seconds
+		// Rotate quotes every 3.3 seconds (3 quotes in 10 seconds)
 		quoteInterval = setInterval(() => {
 			currentQuote = getRandomQuote();
-		}, 3000);
-		// Spin the head
-		spinInterval = setInterval(() => {
-			spinAngle = (spinAngle + 5) % 360;
-		}, 50);
+		}, 3300);
 	}
 
 	function stopLoadingAnimation() {
 		if (quoteInterval) clearInterval(quoteInterval);
-		if (spinInterval) clearInterval(spinInterval);
-		spinAngle = 0;
 	}
 
 	async function handleSubmit() {
@@ -67,15 +94,14 @@
 
 		loading = true;
 		error = '';
-		response = '';
 		startLoadingAnimation();
 
 		try {
 			let aiResponse: string;
 
 			if (testMode) {
-				// Test mode - just wait 3 seconds to see the loading state
-				await new Promise(resolve => setTimeout(resolve, 3000));
+				// Test mode - wait 10 seconds to see the loading state
+				await new Promise(resolve => setTimeout(resolve, 10000));
 				aiResponse = "Based on your viewing history, I'd recommend checking out some quality television. You seem to appreciate shows with strong characters and good storytelling.";
 			} else {
 				// Real API call
@@ -104,6 +130,7 @@
 				]));
 			}
 
+			stopLoadingAnimation();
 			// Navigate to Swanson chat page
 			goto('/swanson');
 
@@ -131,6 +158,16 @@
 	}
 </script>
 
+<style>
+	@keyframes spin-slow {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+	.swanson-spin {
+		animation: spin-slow 2s linear infinite;
+	}
+</style>
+
 <!-- Modal Backdrop -->
 <div
 	class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -150,15 +187,11 @@
 		<div class="bg-gradient-to-r from-indigo-600 to-indigo-800 px-6 py-5">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-4">
-					<div
-						class="relative"
-						style="transform: rotate({spinAngle}deg); transition: transform 0.05s linear;"
-					>
+					<div class:swanson-spin={loading}>
 						<img
 							src="/swanson.png"
 							alt="Swanson"
-							class="w-16 h-16 rounded-full object-cover border-3 border-white shadow-lg"
-							class:animate-pulse={loading}
+							class="w-16 h-16 rounded-full object-cover border-4 border-white shadow-lg"
 						/>
 					</div>
 					<div>
@@ -189,29 +222,16 @@
 		<!-- Body -->
 		<div class="p-6">
 			{#if loading}
-				<!-- Loading State -->
+				<!-- Loading State - Spinning Swanson head with quote -->
 				<div class="text-center py-8">
 					<div class="mb-6">
-						<svg
-							class="animate-spin h-10 w-10 text-indigo-600 mx-auto"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-						>
-							<circle
-								class="opacity-25"
-								cx="12"
-								cy="12"
-								r="10"
-								stroke="currentColor"
-								stroke-width="4"
+						<div class="swanson-spin inline-block">
+							<img
+								src="/swanson.png"
+								alt="Swanson thinking"
+								class="w-24 h-24 rounded-full object-cover border-4 border-indigo-200 shadow-lg"
 							/>
-							<path
-								class="opacity-75"
-								fill="currentColor"
-								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-							/>
-						</svg>
+						</div>
 					</div>
 					<p class="text-lg text-gray-700 italic max-w-sm mx-auto leading-relaxed">
 						"{currentQuote}"
@@ -251,7 +271,7 @@
 
 					{#if testMode}
 						<p class="text-xs text-center text-amber-600">
-							Test mode - will simulate delay then navigate
+							Test mode - 10 second simulated delay
 						</p>
 					{/if}
 				</div>

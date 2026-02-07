@@ -4,7 +4,7 @@
 	import { browser } from '$app/environment';
 	import { api } from '$lib/api';
 
-	// Ron Swanson quotes
+	// 50 Ron Swanson quotes
 	const SWANSON_QUOTES = [
 		"Never half-ass two things. Whole-ass one thing.",
 		"Give a man a fish and feed him for a day. Don't teach a man to fish... and feed yourself. He's a grown man. Fishing's not that hard.",
@@ -12,8 +12,50 @@
 		"Crying: acceptable at funerals and the Grand Canyon.",
 		"Clear alcohols are for rich women on diets.",
 		"I'm a simple man. I like pretty, dark-haired women and breakfast food.",
+		"Any dog under 50 pounds is a cat and cats are useless.",
+		"History began July 4th, 1776. Everything before that was a mistake.",
+		"There is only one bad word: taxes.",
+		"I'd wish you the best of luck but I believe luck is a concept created by the weak to explain their failures.",
+		"The less I know about other people's affairs, the happier I am.",
+		"When people get too chummy with me, I like to call them by the wrong name to let them know I don't really care about them.",
+		"I once worked with a guy for three years and never learned his name. Best friend I ever had.",
 		"Just give me all the bacon and eggs you have.",
-		"Fishing relaxes me. It's like yoga, except I still get to kill something."
+		"Fishing relaxes me. It's like yoga, except I still get to kill something.",
+		"I like saying 'No.' It lowers their enthusiasm.",
+		"Capitalism: God's way of determining who is smart and who is poor.",
+		"I'm not interested in caring about people.",
+		"There are only three ways to motivate people: money, fear, and hunger.",
+		"Keep your tears in your eyes where they belong.",
+		"Normally, if given a choice between doing something and nothing, I'd choose to do nothing. But I will do something if it helps someone else do nothing.",
+		"I have cried twice in my life. Once when I was seven and hit by a school bus. And then again when I heard that Li'l Sebastian had passed.",
+		"People who buy things are suckers.",
+		"Honor. If you don't know what it is, I'm not going to explain it.",
+		"Friends: one to three is sufficient.",
+		"When I eat, it is the food that is scared.",
+		"Breakfast food can serve many purposes.",
+		"I don't want to paint with a broad brush here, but every single contractor in the world is a criminal.",
+		"Great job, everyone. The reception will be held in each of our individual houses, alone.",
+		"There has never been a sadness that can't be cured by breakfast food.",
+		"I am not a sore loser. It's just that I prefer to win and when I don't, I get furious.",
+		"Turkey can never beat cow.",
+		"Please and thank you. That's how it's done.",
+		"I call this turf 'n' turf. It's a 16-oz T-bone and a 24-oz porterhouse.",
+		"On my deathbed, my final wish is to have my ex-wives rush to my side so I can use my dying breath to tell them both to go to hell one last time.",
+		"Under my tutelage, you will grow from boys to men. From men into gladiators. And from gladiators into Swansons.",
+		"I suffer from a condition called 'caring too little.'",
+		"I don't drink alcohol from feminine containers. Glass? Plastic? Lady glass.",
+		"You had me at 'Meat Tornado.'",
+		"Put some alcohol in your mouth to block the words from coming out.",
+		"I'm a man of simple pleasures. Give me a well-cooked steak, a glass of whiskey, and a room full of people I can ignore.",
+		"The only things I care about are golf, meat, and my relationships with my female companions.",
+		"I've said too much. Any more details and I might have feelings.",
+		"If there were more food and fewer people, this would be a perfect party.",
+		"Everything hurts. Running is impossible.",
+		"No home is complete without a proper toolbox. Fill yours with items you'll actually use.",
+		"I like Tom. He doesn't do a lot of work around here. He shows zero initiative. He's not a team player. He's never wanted to go that extra mile. Tom is exactly what I'm looking for in a government employee.",
+		"I know what I'm about, son.",
+		"Cultivate relationships. But not too many.",
+		"Live your life how you want, but don't confuse drama with happiness."
 	];
 
 	interface Message {
@@ -32,7 +74,6 @@
 
 	onMount(() => {
 		if (browser) {
-			// Get context from sessionStorage
 			const storedCheckins = sessionStorage.getItem('swanson_checkins');
 			const storedFilter = sessionStorage.getItem('swanson_filter');
 			const storedMessages = sessionStorage.getItem('swanson_messages');
@@ -47,7 +88,6 @@
 				messages = JSON.parse(storedMessages);
 			}
 
-			// If no context, redirect back
 			if (checkins.length === 0) {
 				goto('/checkins');
 				return;
@@ -61,7 +101,6 @@
 		};
 	});
 
-	// Persist messages to sessionStorage
 	$: if (browser && messages.length > 0) {
 		sessionStorage.setItem('swanson_messages', JSON.stringify(messages));
 	}
@@ -74,7 +113,7 @@
 		currentQuote = getRandomQuote();
 		quoteInterval = setInterval(() => {
 			currentQuote = getRandomQuote();
-		}, 3000);
+		}, 3300);
 	}
 
 	function stopQuoteRotation() {
@@ -87,7 +126,6 @@
 		const userMessage = userInput.trim();
 		userInput = '';
 
-		// Add user message
 		messages = [...messages, { role: 'user', content: userMessage }];
 
 		loading = true;
@@ -97,7 +135,7 @@
 			let response: string;
 
 			if (testMode) {
-				await new Promise(resolve => setTimeout(resolve, 3000));
+				await new Promise(resolve => setTimeout(resolve, 10000));
 				response = `Based on your viewing history, I'd recommend checking out some quality television. You seem to appreciate shows with strong characters and good storytelling. Here are my thoughts on "${userMessage}":\n\n1. Consider rewatching something you loved\n2. Try something completely different\n3. When in doubt, watch Parks and Recreation`;
 			} else {
 				const searchResults = checkins.map(checkin => ({
@@ -135,7 +173,6 @@
 	}
 
 	function goBack() {
-		// Clear swanson session data
 		if (browser) {
 			sessionStorage.removeItem('swanson_messages');
 		}
@@ -143,12 +180,22 @@
 	}
 
 	function formatDateRange(): string {
-		if (!filterInfo) return '';
+		if (!filterInfo || !filterInfo.startDate) return '';
 		const start = new Date(filterInfo.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 		const end = new Date(filterInfo.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 		return `${start} - ${end}`;
 	}
 </script>
+
+<style>
+	@keyframes spin-slow {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+	.swanson-spin {
+		animation: spin-slow 2s linear infinite;
+	}
+</style>
 
 <div class="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
 	<!-- Header -->
@@ -168,7 +215,7 @@
 					<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-medium">
 						{checkins.length} check-ins
 					</span>
-					{#if filterInfo}
+					{#if filterInfo && filterInfo.startDate}
 						<span class="text-gray-400">|</span>
 						<span>{formatDateRange()}</span>
 					{/if}
@@ -179,10 +226,8 @@
 
 	<!-- Chat Area -->
 	<div class="max-w-3xl mx-auto px-4 py-6">
-		<!-- Messages -->
 		<div class="space-y-6 mb-32">
 			{#if messages.length === 0}
-				<!-- Empty state -->
 				<div class="text-center py-12">
 					<img
 						src="/swanson.png"
@@ -198,7 +243,6 @@
 
 			{#each messages as message}
 				<div class="flex gap-4 {message.role === 'user' ? 'flex-row-reverse' : ''}">
-					<!-- Avatar -->
 					<div class="flex-shrink-0">
 						{#if message.role === 'swanson'}
 							<img
@@ -215,7 +259,6 @@
 						{/if}
 					</div>
 
-					<!-- Message -->
 					<div class="flex-1 max-w-xl {message.role === 'user' ? 'text-right' : ''}">
 						<div
 							class="inline-block px-4 py-3 rounded-2xl {message.role === 'user'
@@ -229,23 +272,20 @@
 			{/each}
 
 			{#if loading}
-				<!-- Loading message -->
 				<div class="flex gap-4">
 					<div class="flex-shrink-0">
-						<img
-							src="/swanson.png"
-							alt="Swanson"
-							class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200 animate-pulse"
-						/>
+						<div class="swanson-spin">
+							<img
+								src="/swanson.png"
+								alt="Swanson thinking"
+								class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200"
+							/>
+						</div>
 					</div>
 					<div class="flex-1">
-						<div class="inline-block px-4 py-3 bg-white shadow-sm border border-gray-100 rounded-2xl rounded-bl-md">
+						<div class="inline-block px-4 py-3 bg-white shadow-sm border border-gray-100 rounded-2xl rounded-bl-md max-w-md">
 							<p class="text-gray-600 italic">"{currentQuote}"</p>
-							<div class="flex items-center gap-2 mt-2">
-								<div class="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
-								<div class="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
-								<div class="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
-							</div>
+							<p class="text-xs text-gray-400 mt-2">- Ron Swanson</p>
 						</div>
 					</div>
 				</div>
@@ -253,20 +293,19 @@
 		</div>
 	</div>
 
-	<!-- Input Bar (fixed at bottom) -->
+	<!-- Input Bar -->
 	<div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
 		<div class="max-w-3xl mx-auto">
 			<div class="flex gap-3 items-end">
-				<!-- Swanson icon instead of magnifying glass -->
 				<div class="flex-shrink-0 pb-2">
 					<img
 						src="/swanson.png"
 						alt="Swanson"
 						class="w-10 h-10 rounded-full object-cover border-2 border-indigo-300"
+						class:swanson-spin={loading}
 					/>
 				</div>
 
-				<!-- Input -->
 				<div class="flex-1 relative">
 					<textarea
 						bind:value={userInput}
@@ -278,28 +317,20 @@
 					/>
 				</div>
 
-				<!-- Send button -->
 				<button
 					on:click={sendMessage}
 					disabled={!userInput.trim() || loading}
 					class="flex-shrink-0 p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
-					{#if loading}
-						<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-						</svg>
-					{:else}
-						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-						</svg>
-					{/if}
+					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+					</svg>
 				</button>
 			</div>
 
 			{#if testMode}
 				<p class="text-xs text-center text-amber-600 mt-2">
-					Test mode - responses are simulated
+					Test mode - 10 second simulated delay
 				</p>
 			{/if}
 		</div>
