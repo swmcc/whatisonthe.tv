@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
+    # LLM Configuration
+    llm_provider: str = "anthropic"  # "anthropic" or "openai"
+    anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    llm_model: str = "claude-sonnet-4-20250514"  # or "gpt-4o-mini" for OpenAI
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
