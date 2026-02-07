@@ -135,7 +135,7 @@
 			let response: string;
 
 			if (testMode) {
-				await new Promise(resolve => setTimeout(resolve, 10000));
+				await new Promise(resolve => setTimeout(resolve, 5000));
 				response = `Based on your viewing history, I'd recommend checking out some quality television. You seem to appreciate shows with strong characters and good storytelling. Here are my thoughts on "${userMessage}":\n\n1. Consider rewatching something you loved\n2. Try something completely different\n3. When in doubt, watch Parks and Recreation`;
 			} else {
 				const searchResults = checkins.map(checkin => ({
@@ -211,15 +211,18 @@
 					</svg>
 					Back to Check-ins
 				</button>
-				<div class="flex items-center gap-2 text-sm text-gray-500">
-					<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-medium">
+				<button
+					on:click={goBack}
+					class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+				>
+					<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-medium hover:bg-indigo-200 transition-colors">
 						{checkins.length} check-ins
 					</span>
 					{#if filterInfo && filterInfo.startDate}
 						<span class="text-gray-400">|</span>
 						<span>{formatDateRange()}</span>
 					{/if}
-				</div>
+				</button>
 			</div>
 		</div>
 	</div>
@@ -330,7 +333,7 @@
 
 			{#if testMode}
 				<p class="text-xs text-center text-amber-600 mt-2">
-					Test mode - 10 second simulated delay
+					Test mode - 5 second simulated delay
 				</p>
 			{/if}
 		</div>
