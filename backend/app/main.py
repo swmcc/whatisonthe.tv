@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.api import auth, checkin, search
+from app.api import auth, checkin, search, swanson
 from app.core.config import settings
 from app.db.redis import close_redis, get_redis
 
@@ -54,6 +54,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(search.router, tags=["search"])
 app.include_router(checkin.router)
+app.include_router(swanson.router)
 
 
 @app.get("/health")
