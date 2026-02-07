@@ -3,6 +3,7 @@
 	import { browser } from '$app/environment';
 	import { api } from '$lib/api';
 	import DateFilter from '$lib/components/DateFilter.svelte';
+	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
 	import CheckInModal from '$lib/components/CheckInModal.svelte';
 	import SwansonModal from '$lib/components/SwansonModal.svelte';
 
@@ -15,9 +16,15 @@
 	let searchQuery = '';
 	let startDateFilter = '';
 	let endDateFilter = '';
+	let selectedLocations: string[] = [];
+	let selectedPeople: string[] = [];
 	let showEditModal = false;
 	let editingCheckin: any = null;
 	let showSwansonModal = false;
+
+	// Extract unique locations and people from checkins
+	$: uniqueLocations = [...new Set(checkins.map(c => c.location).filter(Boolean))].sort();
+	$: uniquePeople = [...new Set(checkins.map(c => c.watched_with).filter(Boolean))].sort();
 
 	// Swanson button is only available when a date filter is applied
 	$: showSwansonButton = startDateFilter !== '' || endDateFilter !== '';
@@ -27,7 +34,7 @@
 		showSwansonModal = true;
 	}
 
-	// Filter checkins based on search query and date range
+	// Filter checkins based on search query, date range, location, and people
 	$: filteredCheckins = checkins.filter((checkin) => {
 		// Text search filter
 		if (searchQuery) {
@@ -63,6 +70,20 @@
 				const endDate = new Date(endDateFilter);
 				endDate.setHours(23, 59, 59, 999); // End of day
 				if (checkinDate > endDate) return false;
+			}
+		}
+
+		// Location filter
+		if (selectedLocations.length > 0) {
+			if (!checkin.location || !selectedLocations.includes(checkin.location)) {
+				return false;
+			}
+		}
+
+		// People filter
+		if (selectedPeople.length > 0) {
+			if (!checkin.watched_with || !selectedPeople.includes(checkin.watched_with)) {
+				return false;
 			}
 		}
 
@@ -227,6 +248,24 @@
 			/>
 		</div>
 
+		<!-- Location & People Filters -->
+		<div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+			<MultiSelectFilter
+				label="Where"
+				icon="location"
+				options={uniqueLocations}
+				selected={selectedLocations}
+				on:change={(e) => selectedLocations = e.detail.selected}
+			/>
+			<MultiSelectFilter
+				label="Who"
+				icon="people"
+				options={uniquePeople}
+				selected={selectedPeople}
+				on:change={(e) => selectedPeople = e.detail.selected}
+			/>
+		</div>
+
 		<!-- Search Bar -->
 		<div class="mt-4">
 			<div class="relative">
@@ -255,20 +294,24 @@
 					</div>
 				{/if}
 			</div>
-			{#if (searchQuery || startDateFilter || endDateFilter) && filteredCheckins.length === 0 && !loading}
+			{#if (searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0) && filteredCheckins.length === 0 && !loading}
 				<p class="mt-2 text-sm text-gray-500">
-					No check-ins found{searchQuery ? ` matching "${searchQuery}"` : ''}
-					{startDateFilter || endDateFilter ? ' in selected date range' : ''}
+					No check-ins found matching your filters
 				</p>
-			{:else if searchQuery || startDateFilter || endDateFilter}
+			{:else if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0}
 				<p class="mt-2 text-sm text-gray-500">
 					Found {filteredCheckins.length} check-in{filteredCheckins.length !== 1 ? 's' : ''}
-					{#if searchQuery && (startDateFilter || endDateFilter)}
-						matching "{searchQuery}" in selected date range
-					{:else if searchQuery}
+					{#if searchQuery}
 						matching "{searchQuery}"
-					{:else if startDateFilter || endDateFilter}
-						in selected date range
+					{/if}
+					{#if startDateFilter || endDateFilter}
+						{searchQuery ? ' in' : 'in'} selected date range
+					{/if}
+					{#if selectedLocations.length > 0}
+						at {selectedLocations.length === 1 ? selectedLocations[0] : `${selectedLocations.length} locations`}
+					{/if}
+					{#if selectedPeople.length > 0}
+						with {selectedPeople.length === 1 ? selectedPeople[0] : `${selectedPeople.length} people`}
 					{/if}
 				</p>
 			{/if}
