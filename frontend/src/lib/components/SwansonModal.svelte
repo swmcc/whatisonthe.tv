@@ -100,8 +100,8 @@
 			let aiResponse: string;
 
 			if (testMode) {
-				// Test mode - wait 10 seconds to see the loading state
-				await new Promise(resolve => setTimeout(resolve, 10000));
+				// Test mode - wait 5 seconds to see the loading state
+				await new Promise(resolve => setTimeout(resolve, 5000));
 				aiResponse = "Based on your viewing history, I'd recommend checking out some quality television. You seem to appreciate shows with strong characters and good storytelling.";
 			} else {
 				// Real API call
@@ -271,7 +271,7 @@
 
 					{#if testMode}
 						<p class="text-xs text-center text-amber-600">
-							Test mode - 10 second simulated delay
+							Test mode - 5 second simulated delay
 						</p>
 					{/if}
 				</div>

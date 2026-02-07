@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { api } from '$lib/api';
 	import DateFilter from '$lib/components/DateFilter.svelte';
 	import CheckInModal from '$lib/components/CheckInModal.svelte';
@@ -72,6 +73,16 @@
 	$: groupedCheckins = groupByDay(filteredCheckins);
 
 	onMount(async () => {
+		// Restore filter state if coming back from Swanson
+		if (browser) {
+			const storedFilter = sessionStorage.getItem('swanson_filter');
+			if (storedFilter) {
+				const filter = JSON.parse(storedFilter);
+				if (filter.startDate) startDateFilter = filter.startDate;
+				if (filter.endDate) endDateFilter = filter.endDate;
+			}
+		}
+
 		await loadCheckins();
 		setupInfiniteScroll();
 	});
