@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import { api } from '$lib/api';
+	import { goto } from '$app/navigation';
+	import { api, AuthenticationError } from '$lib/api';
+	import { auth } from '$lib/stores/auth';
 	import DateFilter from '$lib/components/DateFilter.svelte';
 	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
 	import CheckInModal from '$lib/components/CheckInModal.svelte';
@@ -23,8 +25,16 @@
 	let showSwansonModal = false;
 
 	// Extract unique locations and people from checkins
-	$: uniqueLocations = [...new Set(checkins.map(c => c.location).filter(Boolean))].sort();
-	$: uniquePeople = [...new Set(checkins.map(c => c.watched_with).filter(Boolean))].sort();
+	$: uniqueLocations = [...new Set(checkins.map(c => c.location).filter(Boolean))].sort() as string[];
+	$: uniquePeople = [...new Set(checkins.map(c => c.watched_with).filter(Boolean))].sort() as string[];
+
+	// Clean up selected values if they're no longer valid options
+	$: if (uniqueLocations.length > 0) {
+		selectedLocations = selectedLocations.filter(s => uniqueLocations.includes(s));
+	}
+	$: if (uniquePeople.length > 0) {
+		selectedPeople = selectedPeople.filter(s => uniquePeople.includes(s));
+	}
 
 	// Swanson button is only available when a date filter is applied
 	$: showSwansonButton = startDateFilter !== '' || endDateFilter !== '';
@@ -112,6 +122,12 @@
 		loading = true;
 		error = '';
 
+		// Ensure auth is valid before making API call
+		if (!auth.isValid()) {
+			goto('/login');
+			return;
+		}
+
 		try {
 			const response = await api.checkin.list(10); // Load last 10 days
 			checkins = response;
@@ -122,6 +138,10 @@
 				hasMore = false;
 			}
 		} catch (err) {
+			if (err instanceof AuthenticationError) {
+				goto('/login');
+				return;
+			}
 			error = err instanceof Error ? err.message : 'Failed to load check-ins';
 		} finally {
 			loading = false;
@@ -254,17 +274,38 @@
 				label="Where"
 				icon="location"
 				options={uniqueLocations}
-				selected={selectedLocations}
+				bind:selected={selectedLocations}
 				on:change={(e) => selectedLocations = e.detail.selected}
 			/>
 			<MultiSelectFilter
 				label="Who"
 				icon="people"
 				options={uniquePeople}
-				selected={selectedPeople}
+				bind:selected={selectedPeople}
 				on:change={(e) => selectedPeople = e.detail.selected}
 			/>
 		</div>
+
+		<!-- Clear All Filters -->
+		{#if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0}
+			<div class="mt-3">
+				<button
+					on:click={() => {
+						searchQuery = '';
+						startDateFilter = '';
+						endDateFilter = '';
+						selectedLocations = [];
+						selectedPeople = [];
+					}}
+					class="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+				>
+					<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+					Clear all filters
+				</button>
+			</div>
+		{/if}
 
 		<!-- Search Bar -->
 		<div class="mt-4">
