@@ -1,6 +1,6 @@
 """Swanson AI recommendation schemas."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +15,14 @@ class SearchResult(BaseModel):
     genres: Optional[list[str]] = None
 
 
+class FeedbackItem(BaseModel):
+    """User feedback on a recommendation."""
+
+    name: str
+    type: str
+    rating: Literal["dislike", "like", "love"]
+
+
 class RecommendRequest(BaseModel):
     """Request for AI recommendation."""
 
@@ -22,6 +30,14 @@ class RecommendRequest(BaseModel):
     search_results: list[SearchResult] = Field(
         default_factory=list,
         description="Current search results to consider",
+    )
+    feedback: list[FeedbackItem] = Field(
+        default_factory=list,
+        description="User feedback on previous recommendations",
+    )
+    previous_recommendations: list[str] = Field(
+        default_factory=list,
+        description="Titles already recommended in this session",
     )
 
 

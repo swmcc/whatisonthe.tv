@@ -114,6 +114,8 @@ def build_user_prompt(
     user_prompt: str,
     taste_profile: dict,
     search_results: list[dict],
+    feedback: list[dict] | None = None,
+    previous_recommendations: list[str] | None = None,
 ) -> str:
     """Build the full user prompt with context.
 
@@ -121,6 +123,8 @@ def build_user_prompt(
         user_prompt: User's question/request
         taste_profile: User's taste profile from checkins
         search_results: Current search results
+        feedback: User feedback on previous recommendations
+        previous_recommendations: Titles already recommended this session
 
     Returns:
         Formatted prompt string
@@ -157,6 +161,29 @@ def build_user_prompt(
             year_str = f" ({item.get('year')})" if item.get("year") else ""
             parts.append(f"- {item['name']}{year_str}{genres_str} [{item['type']}]")
 
+    # Add feedback on previous recommendations
+    if feedback:
+        loved = [f for f in feedback if f.get("rating") == "love"]
+        liked = [f for f in feedback if f.get("rating") == "like"]
+        disliked = [f for f in feedback if f.get("rating") == "dislike"]
+
+        if loved or liked or disliked:
+            parts.append("\n## User Feedback on Previous Recommendations")
+            if loved:
+                titles = ", ".join(f["name"] for f in loved)
+                parts.append(f"Very interested in: {titles}")
+            if liked:
+                titles = ", ".join(f["name"] for f in liked)
+                parts.append(f"Somewhat interested in: {titles}")
+            if disliked:
+                titles = ", ".join(f["name"] for f in disliked)
+                parts.append(f"Not interested in: {titles}")
+
+    # Add previous recommendations to avoid repeats
+    if previous_recommendations:
+        parts.append("\n## Already Recommended This Session")
+        parts.append(f"Do NOT suggest these again: {', '.join(previous_recommendations)}")
+
     # Add user's question
     parts.append(f"\n## User's Question\n{user_prompt}")
 
@@ -188,6 +215,8 @@ async def get_recommendation(
             request.prompt,
             taste_profile,
             [r.model_dump() for r in request.search_results],
+            [f.model_dump() for f in request.feedback],
+            request.previous_recommendations,
         )
 
         # Get LLM and generate recommendation
@@ -231,6 +260,8 @@ async def get_recommendation_stream(
             request.prompt,
             taste_profile,
             [r.model_dump() for r in request.search_results],
+            [f.model_dump() for f in request.feedback],
+            request.previous_recommendations,
         )
 
         # Get LLM

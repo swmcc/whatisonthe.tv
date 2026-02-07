@@ -1,4 +1,6 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
+
+export type Rating = 'dislike' | 'like' | 'love';
 
 export interface SearchResult {
 	id: number;
@@ -6,6 +8,13 @@ export interface SearchResult {
 	type: string;
 	year?: number;
 	image?: string;
+	rating?: Rating;
+}
+
+export interface FeedbackItem {
+	name: string;
+	type: string;
+	rating: Rating;
 }
 
 export interface Message {
@@ -35,4 +44,42 @@ export function parseTitles(content: string): { cleanContent: string; titles: st
 		return { cleanContent, titles };
 	}
 	return { cleanContent: content, titles: [] };
+}
+
+// Collect all feedback from messages
+export function collectFeedback(): FeedbackItem[] {
+	const messages = get(swansonMessages);
+	const feedback: FeedbackItem[] = [];
+
+	for (const msg of messages) {
+		if (msg.role === 'swanson' && msg.recommendations) {
+			for (const rec of msg.recommendations) {
+				if (rec.rating) {
+					feedback.push({
+						name: rec.name,
+						type: rec.type,
+						rating: rec.rating
+					});
+				}
+			}
+		}
+	}
+
+	return feedback;
+}
+
+// Collect all previously recommended titles
+export function collectPreviousRecommendations(): string[] {
+	const messages = get(swansonMessages);
+	const titles: string[] = [];
+
+	for (const msg of messages) {
+		if (msg.role === 'swanson' && msg.recommendations) {
+			for (const rec of msg.recommendations) {
+				titles.push(rec.name);
+			}
+		}
+	}
+
+	return titles;
 }
