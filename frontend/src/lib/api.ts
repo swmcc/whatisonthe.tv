@@ -217,6 +217,12 @@ export const api = {
 				year?: number;
 				genres?: string[];
 			}>;
+			feedback?: Array<{
+				name: string;
+				type: string;
+				rating: 'dislike' | 'like' | 'love';
+			}>;
+			previous_recommendations?: string[];
 		}) => {
 			return request('/swanson/recommend', {
 				method: 'POST',
@@ -234,6 +240,12 @@ export const api = {
 				year?: number;
 				genres?: string[];
 			}>;
+			feedback?: Array<{
+				name: string;
+				type: string;
+				rating: 'dislike' | 'like' | 'love';
+			}>;
+			previous_recommendations?: string[];
 		}): AsyncGenerator<string, void, unknown> {
 			console.log('[API] stream() called with prompt:', data.prompt.substring(0, 50));
 			const authState = get(auth);

@@ -4,7 +4,7 @@
 	import { browser } from '$app/environment';
 	import { api } from '$lib/api';
 	import { auth } from '$lib/stores/auth';
-	import { swansonLoading, swansonStreamingText, swansonMessages, resetSwansonStores, parseTitles, type SearchResult } from '$lib/stores/swanson';
+	import { swansonLoading, swansonStreamingText, swansonMessages, resetSwansonStores, parseTitles, collectFeedback, collectPreviousRecommendations, type SearchResult, type Rating } from '$lib/stores/swanson';
 
 	// Simple streaming-safe markdown renderer
 	function renderMarkdown(text: string): string {
@@ -194,17 +194,36 @@
 		return results;
 	}
 
+	function rateRecommendation(messageIndex: number, recIndex: number, rating: Rating) {
+		swansonMessages.update(msgs => {
+			const newMsgs = [...msgs];
+			const msg = newMsgs[messageIndex];
+			if (msg.recommendations && msg.recommendations[recIndex]) {
+				const rec = msg.recommendations[recIndex];
+				// Toggle off if clicking the same rating
+				rec.rating = rec.rating === rating ? undefined : rating;
+			}
+			return newMsgs;
+		});
+	}
+
 	async function streamResponse(prompt: string) {
 		swansonMessages.update(msgs => [...msgs, { role: 'user', content: prompt }]);
 		swansonLoading.set(true);
 		swansonStreamingText.set('');
 		startQuoteRotation();
 
+		// Collect feedback and previous recommendations
+		const feedback = collectFeedback();
+		const previousRecs = collectPreviousRecommendations();
+
 		try {
 			let accumulated = '';
 			for await (const chunk of api.swanson.stream({
 				prompt,
-				search_results: searchResults
+				search_results: searchResults,
+				feedback: feedback.length > 0 ? feedback : undefined,
+				previous_recommendations: previousRecs.length > 0 ? previousRecs : undefined
 			})) {
 				accumulated += chunk;
 				swansonStreamingText.set(accumulated);
@@ -397,30 +416,62 @@
 						</div>
 
 						{#if message.role === 'swanson' && message.recommendations && message.recommendations.length > 0}
+							{@const messageIndex = $swansonMessages.indexOf(message)}
 							<div class="mt-4 flex flex-wrap gap-4">
-								{#each message.recommendations as rec}
-									<a
-										href="/show/{rec.id}{rec.type === 'movie' ? '?type=movie' : ''}"
-										class="group flex items-center gap-4 px-4 py-3 rounded-2xl bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 shadow-sm hover:shadow-md transition-all"
-									>
-										{#if rec.image}
-											<img
-												src={rec.image}
-												alt={rec.name}
-												class="w-14 h-20 rounded-lg object-cover shadow-sm"
-											/>
-										{:else}
-											<div class="w-14 h-20 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center shadow-sm">
-												<svg class="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-												</svg>
+								{#each message.recommendations as rec, recIndex}
+									<div class="group flex items-center gap-4 px-4 py-3 rounded-2xl bg-gray-50 border border-gray-200 shadow-sm">
+										<a
+											href="/show/{rec.id}{rec.type === 'movie' ? '?type=movie' : ''}"
+											class="flex items-center gap-4 hover:opacity-80 transition-opacity"
+										>
+											{#if rec.image}
+												<img
+													src={rec.image}
+													alt={rec.name}
+													class="w-14 h-20 rounded-lg object-cover shadow-sm"
+												/>
+											{:else}
+												<div class="w-14 h-20 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center shadow-sm">
+													<svg class="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+													</svg>
+												</div>
+											{/if}
+											<div class="min-w-0">
+												<p class="text-base font-medium text-gray-900 truncate max-w-[140px]">{rec.name}</p>
+												<p class="text-sm text-gray-500">{rec.type === 'movie' ? 'Movie' : 'Series'}{rec.year ? ` · ${rec.year}` : ''}</p>
 											</div>
-										{/if}
-										<div class="min-w-0">
-											<p class="text-base font-medium text-gray-900 group-hover:text-indigo-600 truncate max-w-[180px]">{rec.name}</p>
-											<p class="text-sm text-gray-500">{rec.type === 'movie' ? 'Movie' : 'Series'}{rec.year ? ` · ${rec.year}` : ''}</p>
+										</a>
+										<div class="flex gap-1 ml-auto pl-2 border-l border-gray-200">
+											<button
+												on:click={() => rateRecommendation(messageIndex, recIndex, 'dislike')}
+												class="p-1.5 rounded-full transition-colors {rec.rating === 'dislike' ? 'text-red-500 bg-red-50' : 'text-gray-300 hover:text-gray-400 hover:bg-gray-100'}"
+												title="Not interested"
+											>
+												<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17" />
+												</svg>
+											</button>
+											<button
+												on:click={() => rateRecommendation(messageIndex, recIndex, 'like')}
+												class="p-1.5 rounded-full transition-colors {rec.rating === 'like' ? 'text-indigo-500 bg-indigo-50' : 'text-gray-300 hover:text-gray-400 hover:bg-gray-100'}"
+												title="Interested"
+											>
+												<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" />
+												</svg>
+											</button>
+											<button
+												on:click={() => rateRecommendation(messageIndex, recIndex, 'love')}
+												class="p-1.5 rounded-full transition-colors {rec.rating === 'love' ? 'text-yellow-500 bg-yellow-50' : 'text-gray-300 hover:text-gray-400 hover:bg-gray-100'}"
+												title="Very interested"
+											>
+												<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+													<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+												</svg>
+											</button>
 										</div>
-									</a>
+									</div>
 								{/each}
 							</div>
 						{/if}
