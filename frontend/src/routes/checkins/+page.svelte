@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import { goto } from '$app/navigation';
-	import { browser } from '$app/environment';
 	import DateFilter from '$lib/components/DateFilter.svelte';
 	import CheckInModal from '$lib/components/CheckInModal.svelte';
+	import SwansonModal from '$lib/components/SwansonModal.svelte';
 
 	let checkins: any[] = [];
 	let loading = true;
@@ -17,24 +16,14 @@
 	let endDateFilter = '';
 	let showEditModal = false;
 	let editingCheckin: any = null;
+	let showSwansonModal = false;
 
-	// Swanson is only available when a date filter is applied
-	$: showSwanson = startDateFilter !== '' || endDateFilter !== '';
+	// Swanson button is only available when a date filter is applied
+	$: showSwansonButton = startDateFilter !== '' || endDateFilter !== '';
 
-	function askSwanson() {
-		if (!showSwanson) return;
-
-		// Store filtered checkins in sessionStorage for the Swanson page
-		if (browser) {
-			sessionStorage.setItem('swanson_checkins', JSON.stringify(filteredCheckins));
-			sessionStorage.setItem('swanson_filter', JSON.stringify({
-				hasDateFilter: true,
-				startDate: startDateFilter,
-				endDate: endDateFilter
-			}));
-		}
-
-		goto('/swanson');
+	function openSwanson() {
+		if (!showSwansonButton) return;
+		showSwansonModal = true;
 	}
 
 	// Filter checkins based on search query and date range
@@ -528,12 +517,21 @@
 {/if}
 
 <!-- Swanson floating button - only appears when date filter is applied -->
-{#if showSwanson && filteredCheckins.length > 0}
+{#if showSwansonButton && filteredCheckins.length > 0}
 	<button
-		on:click={askSwanson}
+		on:click={openSwanson}
 		class="fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden border-2 border-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 z-50 hover:scale-110"
 		title="Ask Swanson for recommendations"
 	>
 		<img src="/swanson.png" alt="Ask Swanson" class="w-full h-full object-cover" />
 	</button>
+{/if}
+
+<!-- Swanson Modal -->
+{#if showSwansonModal}
+	<SwansonModal
+		checkins={filteredCheckins}
+		testMode={true}
+		on:close={() => showSwansonModal = false}
+	/>
 {/if}
