@@ -1,6 +1,7 @@
 """Swanson AI recommendation API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -198,4 +199,53 @@ async def get_recommendation(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate recommendation: {str(e)}",
+        )
+
+
+@router.post("/recommend/stream")
+async def get_recommendation_stream(
+    request: RecommendRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Stream an AI-powered recommendation.
+
+    Returns Server-Sent Events with text chunks as they're generated.
+    """
+    try:
+        # Get user's taste profile from checkins
+        taste_profile = await get_user_taste_profile(db, current_user.id)
+
+        # Build the full prompt
+        user_prompt = build_user_prompt(
+            request.prompt,
+            taste_profile,
+            [r.model_dump() for r in request.search_results],
+        )
+
+        # Get LLM
+        llm = get_llm()
+
+        async def generate():
+            try:
+                async for chunk in llm.stream(SYSTEM_PROMPT, user_prompt):
+                    # SSE format: data: <content>\n\n
+                    yield f"data: {chunk}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                yield f"data: [ERROR] {str(e)}\n\n"
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
         )

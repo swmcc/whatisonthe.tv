@@ -17,7 +17,7 @@
 		const segments = pathname.split('/').filter(s => s.length > 0);
 		if (segments.length !== 1) return false;
 
-		const knownRoutes = ['login', 'about', 'colophon', 'show', 'checkins', 'settings'];
+		const knownRoutes = ['login', 'about', 'colophon', 'show', 'checkins', 'settings', 'swanson'];
 		return !knownRoutes.includes(segments[0]);
 	}
 

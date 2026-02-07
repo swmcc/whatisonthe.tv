@@ -1,8 +1,24 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, afterUpdate } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { api } from '$lib/api';
+	import { auth } from '$lib/stores/auth';
+	import { swansonLoading, swansonStreamingText, swansonMessages, resetSwansonStores } from '$lib/stores/swanson';
+
+	let chatBottom: HTMLDivElement;
+
+	function scrollToBottom() {
+		if (chatBottom) {
+			chatBottom.scrollIntoView({ behavior: 'smooth' });
+		}
+	}
+
+	afterUpdate(() => {
+		if ($swansonMessages.length > 0 || $swansonLoading) {
+			scrollToBottom();
+		}
+	});
 
 	// 50 Ron Swanson quotes
 	const SWANSON_QUOTES = [
@@ -58,39 +74,41 @@
 		"Live your life how you want, but don't confuse drama with happiness."
 	];
 
-	interface Message {
-		role: 'user' | 'swanson';
-		content: string;
-	}
-
-	let messages: Message[] = [];
 	let userInput = '';
-	let loading = false;
-	let currentQuote = '';
+	let currentQuote = "Never half-ass two things. Whole-ass one thing.";
 	let quoteInterval: ReturnType<typeof setInterval>;
-	let checkins: any[] = [];
-	let filterInfo: { startDate: string; endDate: string } | null = null;
-	let testMode = true; // Set to false for real API calls
 
-	onMount(() => {
+	let checkins: any[] = [];
+	let searchResults: any[] = [];
+	let filterInfo: { startDate: string; endDate: string } | null = null;
+
+	onMount(async () => {
+		// Reset global stores on mount
+		resetSwansonStores();
+
 		if (browser) {
 			const storedCheckins = sessionStorage.getItem('swanson_checkins');
 			const storedFilter = sessionStorage.getItem('swanson_filter');
 			const storedMessages = sessionStorage.getItem('swanson_messages');
+			const storedSearchResults = sessionStorage.getItem('swanson_search_results');
+			const pendingPrompt = sessionStorage.getItem('swanson_pending_prompt');
 
-			if (storedCheckins) {
-				checkins = JSON.parse(storedCheckins);
-			}
-			if (storedFilter) {
-				filterInfo = JSON.parse(storedFilter);
-			}
-			if (storedMessages) {
-				messages = JSON.parse(storedMessages);
-			}
+			if (storedCheckins) checkins = JSON.parse(storedCheckins);
+			if (storedFilter) filterInfo = JSON.parse(storedFilter);
+			if (storedMessages) swansonMessages.set(JSON.parse(storedMessages));
+			if (storedSearchResults) searchResults = JSON.parse(storedSearchResults);
 
 			if (checkins.length === 0) {
 				goto('/checkins');
 				return;
+			}
+
+			// If there's a pending prompt, defer to next frame to ensure component is ready
+			if (pendingPrompt) {
+				sessionStorage.removeItem('swanson_pending_prompt');
+				setTimeout(() => {
+					streamResponse(pendingPrompt);
+				}, 0);
 			}
 		}
 
@@ -101,8 +119,8 @@
 		};
 	});
 
-	$: if (browser && messages.length > 0) {
-		sessionStorage.setItem('swanson_messages', JSON.stringify(messages));
+	$: if (browser && $swansonMessages.length > 0) {
+		sessionStorage.setItem('swanson_messages', JSON.stringify($swansonMessages));
 	}
 
 	function getRandomQuote(): string {
@@ -110,6 +128,7 @@
 	}
 
 	function startQuoteRotation() {
+		if (quoteInterval) clearInterval(quoteInterval);
 		currentQuote = getRandomQuote();
 		quoteInterval = setInterval(() => {
 			currentQuote = getRandomQuote();
@@ -120,49 +139,42 @@
 		if (quoteInterval) clearInterval(quoteInterval);
 	}
 
-	async function sendMessage() {
-		if (!userInput.trim() || loading) return;
-
-		const userMessage = userInput.trim();
-		userInput = '';
-
-		messages = [...messages, { role: 'user', content: userMessage }];
-
-		loading = true;
+	async function streamResponse(prompt: string) {
+		swansonMessages.update(msgs => [...msgs, { role: 'user', content: prompt }]);
+		swansonLoading.set(true);
+		swansonStreamingText.set('');
 		startQuoteRotation();
 
 		try {
-			let response: string;
-
-			if (testMode) {
-				await new Promise(resolve => setTimeout(resolve, 5000));
-				response = `Based on your viewing history, I'd recommend checking out some quality television. You seem to appreciate shows with strong characters and good storytelling. Here are my thoughts on "${userMessage}":\n\n1. Consider rewatching something you loved\n2. Try something completely different\n3. When in doubt, watch Parks and Recreation`;
-			} else {
-				const searchResults = checkins.map(checkin => ({
-					id: checkin.content?.tvdb_id || checkin.content?.id,
-					name: checkin.content?.name || 'Unknown',
-					type: checkin.content?.content_type || 'unknown',
-					year: checkin.content?.year,
-					genres: []
-				}));
-
-				const result = await api.swanson.recommend({
-					prompt: userMessage,
-					search_results: searchResults
-				});
-				response = result.recommendation;
+			let accumulated = '';
+			for await (const chunk of api.swanson.stream({
+				prompt,
+				search_results: searchResults
+			})) {
+				accumulated += chunk;
+				swansonStreamingText.set(accumulated);
 			}
 
-			messages = [...messages, { role: 'swanson', content: response }];
+			swansonMessages.update(msgs => [...msgs, { role: 'swanson', content: accumulated }]);
+			swansonStreamingText.set('');
 		} catch (err) {
-			messages = [...messages, {
+			swansonMessages.update(msgs => [...msgs, {
 				role: 'swanson',
 				content: `Something went wrong. ${err instanceof Error ? err.message : 'Try again.'}`
-			}];
+			}]);
 		} finally {
-			loading = false;
+			swansonLoading.set(false);
 			stopQuoteRotation();
 		}
+	}
+
+	async function sendMessage() {
+		if (!userInput.trim() || $swansonLoading) return;
+
+		const prompt = userInput.trim();
+		userInput = '';
+
+		await streamResponse(prompt);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -175,7 +187,9 @@
 	function goBack() {
 		if (browser) {
 			sessionStorage.removeItem('swanson_messages');
+			sessionStorage.removeItem('swanson_pending_prompt');
 		}
+		swansonMessages.set([]);
 		goto('/checkins');
 	}
 
@@ -197,40 +211,36 @@
 	}
 </style>
 
-<div class="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
-	<!-- Header -->
-	<div class="bg-white border-b border-gray-200 sticky top-0 z-10">
-		<div class="max-w-3xl mx-auto px-4 py-3">
-			<div class="flex items-center justify-between">
-				<button
-					on:click={goBack}
-					class="text-gray-600 hover:text-gray-900 flex items-center gap-2 text-sm"
-				>
-					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-					</svg>
-					Back to Check-ins
-				</button>
-				<button
-					on:click={goBack}
-					class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-				>
-					<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-medium hover:bg-indigo-200 transition-colors">
-						{checkins.length} check-ins
-					</span>
-					{#if filterInfo && filterInfo.startDate}
-						<span class="text-gray-400">|</span>
-						<span>{formatDateRange()}</span>
-					{/if}
-				</button>
+<!-- Sub-header with context -->
+<div class="bg-gradient-to-b from-indigo-50 to-white border-b border-gray-200">
+	<div class="max-w-3xl mx-auto px-4 py-3">
+		<div class="flex items-center justify-between">
+			<button
+				on:click={goBack}
+				class="text-gray-600 hover:text-gray-900 flex items-center gap-2 text-sm"
+			>
+				<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+				</svg>
+				Back to Check-ins
+			</button>
+			<div class="flex items-center gap-2 text-sm text-gray-500">
+				<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-medium">
+					{checkins.length} check-ins
+				</span>
+				{#if filterInfo && filterInfo.startDate}
+					<span class="text-gray-400">|</span>
+					<span>{formatDateRange()}</span>
+				{/if}
 			</div>
 		</div>
 	</div>
+</div>
 
-	<!-- Chat Area -->
+<!-- Chat Area -->
 	<div class="max-w-3xl mx-auto px-4 py-6">
 		<div class="space-y-6 mb-32">
-			{#if messages.length === 0}
+			{#if $swansonMessages.length === 0 && !$swansonLoading}
 				<div class="text-center py-12">
 					<img
 						src="/swanson.png"
@@ -244,7 +254,7 @@
 				</div>
 			{/if}
 
-			{#each messages as message}
+			{#each $swansonMessages as message}
 				<div class="flex gap-4 {message.role === 'user' ? 'flex-row-reverse' : ''}">
 					<div class="flex-shrink-0">
 						{#if message.role === 'swanson'}
@@ -254,10 +264,8 @@
 								class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200"
 							/>
 						{:else}
-							<div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-								<svg class="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-								</svg>
+							<div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-medium">
+								{$auth.user?.first_name?.[0] || ''}{$auth.user?.last_name?.[0] || ''}
 							</div>
 						{/if}
 					</div>
@@ -274,25 +282,28 @@
 				</div>
 			{/each}
 
-			{#if loading}
+			{#if $swansonLoading}
 				<div class="flex gap-4">
 					<div class="flex-shrink-0">
-						<div class="swanson-spin">
-							<img
-								src="/swanson.png"
-								alt="Swanson thinking"
-								class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200"
-							/>
-						</div>
+						<img
+							src="/swanson.png"
+							alt="Swanson thinking"
+							class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200 swanson-spin"
+						/>
 					</div>
 					<div class="flex-1">
-						<div class="inline-block px-4 py-3 bg-white shadow-sm border border-gray-100 rounded-2xl rounded-bl-md max-w-md">
-							<p class="text-gray-600 italic">"{currentQuote}"</p>
-							<p class="text-xs text-gray-400 mt-2">- Ron Swanson</p>
+						<div class="inline-block px-4 py-3 bg-white shadow-sm border border-gray-100 rounded-2xl rounded-bl-md max-w-xl">
+							{#if $swansonStreamingText}
+								<p class="whitespace-pre-wrap">{$swansonStreamingText}<span class="animate-pulse">▊</span></p>
+							{:else}
+								<p class="text-gray-600 italic">"{currentQuote}"</p>
+								<p class="text-xs text-gray-400 mt-2">- Ron Swanson</p>
+							{/if}
 						</div>
 					</div>
 				</div>
 			{/if}
+			<div bind:this={chatBottom}></div>
 		</div>
 	</div>
 
@@ -305,7 +316,7 @@
 						src="/swanson.png"
 						alt="Swanson"
 						class="w-10 h-10 rounded-full object-cover border-2 border-indigo-300"
-						class:swanson-spin={loading}
+						class:swanson-spin={$swansonLoading}
 					/>
 				</div>
 
@@ -315,14 +326,14 @@
 						on:keydown={handleKeydown}
 						placeholder="Ask me anything about what to watch..."
 						rows="1"
-						disabled={loading}
+						disabled={$swansonLoading}
 						class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
 					/>
 				</div>
 
 				<button
 					on:click={sendMessage}
-					disabled={!userInput.trim() || loading}
+					disabled={!userInput.trim() || $swansonLoading}
 					class="flex-shrink-0 p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
 					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -330,12 +341,5 @@
 					</svg>
 				</button>
 			</div>
-
-			{#if testMode}
-				<p class="text-xs text-center text-amber-600 mt-2">
-					Test mode - 5 second simulated delay
-				</p>
-			{/if}
 		</div>
 	</div>
-</div>
