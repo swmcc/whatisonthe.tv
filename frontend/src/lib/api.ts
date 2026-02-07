@@ -206,5 +206,23 @@ export const api = {
 				requiresAuth: true
 			});
 		}
+	},
+	swanson: {
+		recommend: async (data: {
+			prompt: string;
+			search_results: Array<{
+				id: number;
+				name: string;
+				type: string;
+				year?: number;
+				genres?: string[];
+			}>;
+		}) => {
+			return request('/swanson/recommend', {
+				method: 'POST',
+				body: JSON.stringify(data),
+				requiresAuth: true
+			});
+		}
 	}
 };
