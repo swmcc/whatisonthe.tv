@@ -79,9 +79,25 @@ local.db.pull: ## Pull production database from Heroku
 	rm /tmp/heroku_db.dump
 	@echo "$(GREEN)✅ Production database pulled successfully$(RESET)"
 
-local.test: ## Run backend tests
-	@echo "$(GREEN)==> Running tests...$(RESET)"
+local.test: ## Run all tests (backend + frontend)
+	@echo "$(GREEN)==> Running all tests...$(RESET)"
+	@echo "$(YELLOW)==> Backend tests (pytest)...$(RESET)"
 	cd backend && pytest
+	@echo "$(YELLOW)==> Frontend tests (vitest)...$(RESET)"
+	cd frontend && npm run test:run
+	@echo "$(GREEN)✅ All tests passed$(RESET)"
+
+local.test.backend: ## Run backend tests only (pytest)
+	@echo "$(GREEN)==> Running backend tests...$(RESET)"
+	cd backend && pytest
+
+local.test.frontend: ## Run frontend tests only (vitest)
+	@echo "$(GREEN)==> Running frontend tests...$(RESET)"
+	cd frontend && npm run test:run
+
+local.test.frontend.watch: ## Run frontend tests in watch mode
+	@echo "$(GREEN)==> Running frontend tests (watch mode)...$(RESET)"
+	cd frontend && npm run test
 
 local.test.cov: ## Run tests with coverage report
 	@echo "$(GREEN)==> Running tests with coverage...$(RESET)"
@@ -147,4 +163,6 @@ db-downgrade: local.db.downgrade
 db-revision: local.db.revision
 db-pull: local.db.pull
 test: local.test
+test-backend: local.test.backend
+test-frontend: local.test.frontend
 test-cov: local.test.cov
