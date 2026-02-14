@@ -20,13 +20,22 @@
 	let endDateFilter = '';
 	let selectedLocations: string[] = [];
 	let selectedPeople: string[] = [];
+	let selectedMediaTypes: string[] = [];
 	let showEditModal = false;
 	let editingCheckin: any = null;
 	let showSwansonModal = false;
 
-	// Extract unique locations and people from checkins
+	// Extract unique locations, people, and media types from checkins
 	$: uniqueLocations = [...new Set(checkins.map(c => c.location).filter(Boolean))].sort() as string[];
 	$: uniquePeople = [...new Set(checkins.map(c => c.watched_with).filter(Boolean))].sort() as string[];
+
+	// Media type options with display labels
+	const mediaTypeLabels: Record<string, string> = {
+		'movie': 'Film',
+		'series': 'TV Series'
+	};
+	$: uniqueMediaTypes = [...new Set(checkins.map(c => c.content?.content_type).filter(Boolean))].sort() as string[];
+	$: mediaTypeOptions = uniqueMediaTypes.map(type => mediaTypeLabels[type] || type);
 
 	// Clean up selected values if they're no longer valid options
 	$: if (uniqueLocations.length > 0) {
@@ -34,6 +43,17 @@
 	}
 	$: if (uniquePeople.length > 0) {
 		selectedPeople = selectedPeople.filter(s => uniquePeople.includes(s));
+	}
+	$: if (mediaTypeOptions.length > 0) {
+		selectedMediaTypes = selectedMediaTypes.filter(s => mediaTypeOptions.includes(s));
+	}
+
+	// Helper to convert display label back to content_type
+	function labelToContentType(label: string): string {
+		for (const [type, displayLabel] of Object.entries(mediaTypeLabels)) {
+			if (displayLabel === label) return type;
+		}
+		return label;
 	}
 
 	// Swanson button is only available when a date filter is applied
@@ -93,6 +113,16 @@
 		// People filter
 		if (selectedPeople.length > 0) {
 			if (!checkin.watched_with || !selectedPeople.includes(checkin.watched_with)) {
+				return false;
+			}
+		}
+
+		// Media type filter
+		if (selectedMediaTypes.length > 0) {
+			const contentType = checkin.content?.content_type;
+			if (!contentType) return false;
+			const selectedContentTypes = selectedMediaTypes.map(labelToContentType);
+			if (!selectedContentTypes.includes(contentType)) {
 				return false;
 			}
 		}
@@ -268,8 +298,8 @@
 			/>
 		</div>
 
-		<!-- Location & People Filters -->
-		<div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+		<!-- Location, People & Media Type Filters -->
+		<div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
 			<MultiSelectFilter
 				label="Where"
 				icon="location"
@@ -284,10 +314,17 @@
 				bind:selected={selectedPeople}
 				on:change={(e) => selectedPeople = e.detail.selected}
 			/>
+			<MultiSelectFilter
+				label="Type"
+				icon="media"
+				options={mediaTypeOptions}
+				bind:selected={selectedMediaTypes}
+				on:change={(e) => selectedMediaTypes = e.detail.selected}
+			/>
 		</div>
 
 		<!-- Clear All Filters -->
-		{#if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0}
+		{#if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0 || selectedMediaTypes.length > 0}
 			<div class="mt-3">
 				<button
 					on:click={() => {
@@ -296,6 +333,7 @@
 						endDateFilter = '';
 						selectedLocations = [];
 						selectedPeople = [];
+						selectedMediaTypes = [];
 					}}
 					class="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
 				>
@@ -335,11 +373,11 @@
 					</div>
 				{/if}
 			</div>
-			{#if (searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0) && filteredCheckins.length === 0 && !loading}
+			{#if (searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0 || selectedMediaTypes.length > 0) && filteredCheckins.length === 0 && !loading}
 				<p class="mt-2 text-sm text-gray-500">
 					No check-ins found matching your filters
 				</p>
-			{:else if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0}
+			{:else if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0 || selectedMediaTypes.length > 0}
 				<p class="mt-2 text-sm text-gray-500">
 					Found {filteredCheckins.length} check-in{filteredCheckins.length !== 1 ? 's' : ''}
 					{#if searchQuery}
@@ -353,6 +391,9 @@
 					{/if}
 					{#if selectedPeople.length > 0}
 						with {selectedPeople.length === 1 ? selectedPeople[0] : `${selectedPeople.length} people`}
+					{/if}
+					{#if selectedMediaTypes.length > 0}
+						({selectedMediaTypes.length === 1 ? selectedMediaTypes[0] : `${selectedMediaTypes.length} types`})
 					{/if}
 				</p>
 			{/if}
