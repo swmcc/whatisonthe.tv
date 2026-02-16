@@ -150,6 +150,7 @@ export const api = {
 			location?: string;
 			watched_with?: string;
 			notes?: string;
+			focus?: 'focused' | 'distracted' | 'background' | 'sleep';
 		}) => {
 			return request('/checkins', {
 				method: 'POST',
@@ -187,6 +188,7 @@ export const api = {
 				location?: string;
 				watched_with?: string;
 				notes?: string;
+				focus?: 'focused' | 'distracted' | 'background' | 'sleep' | null;
 			}
 		) => {
 			return request(`/checkins/${id}`, {
