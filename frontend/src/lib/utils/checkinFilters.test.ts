@@ -5,15 +5,19 @@ import {
 	filterByLocations,
 	filterByPeople,
 	filterByMediaTypes,
+	filterByFocusLevels,
 	applyFilters,
 	filterCheckins,
 	extractUniqueLocations,
 	extractUniquePeople,
 	extractUniqueMediaTypes,
+	extractUniqueFocusLevels,
 	groupByDay,
 	hasActiveFilters,
 	labelToContentType,
 	contentTypeToLabel,
+	labelToFocusLevel,
+	focusLevelToLabel,
 	type Checkin,
 	type FilterOptions
 } from './checkinFilters';
@@ -26,6 +30,7 @@ function createCheckin(overrides: Partial<Checkin> = {}): Checkin {
 		location: 'Home',
 		watched_with: 'Family',
 		notes: 'Great show!',
+		focus: null,
 		content: {
 			name: 'Breaking Bad',
 			content_type: 'series'
@@ -62,6 +67,50 @@ describe('contentTypeToLabel', () => {
 
 	it('returns unknown types unchanged', () => {
 		expect(contentTypeToLabel('documentary')).toBe('documentary');
+	});
+});
+
+describe('labelToFocusLevel', () => {
+	it('converts Focused to focused', () => {
+		expect(labelToFocusLevel('Focused')).toBe('focused');
+	});
+
+	it('converts Second Screening to distracted', () => {
+		expect(labelToFocusLevel('Second Screening')).toBe('distracted');
+	});
+
+	it('converts Background to background', () => {
+		expect(labelToFocusLevel('Background')).toBe('background');
+	});
+
+	it('converts Sleep to sleep', () => {
+		expect(labelToFocusLevel('Sleep')).toBe('sleep');
+	});
+
+	it('returns unknown labels unchanged', () => {
+		expect(labelToFocusLevel('Custom')).toBe('Custom');
+	});
+});
+
+describe('focusLevelToLabel', () => {
+	it('converts focused to Focused', () => {
+		expect(focusLevelToLabel('focused')).toBe('Focused');
+	});
+
+	it('converts distracted to Second Screening', () => {
+		expect(focusLevelToLabel('distracted')).toBe('Second Screening');
+	});
+
+	it('converts background to Background', () => {
+		expect(focusLevelToLabel('background')).toBe('Background');
+	});
+
+	it('converts sleep to Sleep', () => {
+		expect(focusLevelToLabel('sleep')).toBe('Sleep');
+	});
+
+	it('returns unknown levels unchanged', () => {
+		expect(focusLevelToLabel('custom')).toBe('custom');
 	});
 });
 
@@ -228,6 +277,55 @@ describe('filterByMediaTypes', () => {
 	});
 });
 
+describe('filterByFocusLevels', () => {
+	it('returns true when focusLevels array is empty', () => {
+		const checkin = createCheckin({ focus: 'distracted' });
+		expect(filterByFocusLevels(checkin, [])).toBe(true);
+	});
+
+	it('treats null/undefined focus as focused', () => {
+		const checkinNull = createCheckin({ focus: null });
+		const checkinUndefined = createCheckin({ focus: undefined });
+
+		expect(filterByFocusLevels(checkinNull, ['Focused'])).toBe(true);
+		expect(filterByFocusLevels(checkinUndefined, ['Focused'])).toBe(true);
+		expect(filterByFocusLevels(checkinNull, ['Second Screening'])).toBe(false);
+	});
+
+	it('matches Focused', () => {
+		const checkin = createCheckin({ focus: 'focused' });
+		expect(filterByFocusLevels(checkin, ['Focused'])).toBe(true);
+		expect(filterByFocusLevels(checkin, ['Second Screening'])).toBe(false);
+	});
+
+	it('matches Second Screening (distracted)', () => {
+		const checkin = createCheckin({ focus: 'distracted' });
+		expect(filterByFocusLevels(checkin, ['Second Screening'])).toBe(true);
+		expect(filterByFocusLevels(checkin, ['Focused'])).toBe(false);
+	});
+
+	it('matches Background', () => {
+		const checkin = createCheckin({ focus: 'background' });
+		expect(filterByFocusLevels(checkin, ['Background'])).toBe(true);
+		expect(filterByFocusLevels(checkin, ['Focused'])).toBe(false);
+	});
+
+	it('matches Sleep', () => {
+		const checkin = createCheckin({ focus: 'sleep' });
+		expect(filterByFocusLevels(checkin, ['Sleep'])).toBe(true);
+		expect(filterByFocusLevels(checkin, ['Focused'])).toBe(false);
+	});
+
+	it('matches multiple focus levels', () => {
+		const distractedCheckin = createCheckin({ focus: 'distracted' });
+		const sleepCheckin = createCheckin({ focus: 'sleep' });
+
+		expect(filterByFocusLevels(distractedCheckin, ['Second Screening', 'Sleep'])).toBe(true);
+		expect(filterByFocusLevels(sleepCheckin, ['Second Screening', 'Sleep'])).toBe(true);
+		expect(filterByFocusLevels(distractedCheckin, ['Focused', 'Background'])).toBe(false);
+	});
+});
+
 describe('applyFilters', () => {
 	it('returns true when no filters are applied', () => {
 		const checkin = createCheckin();
@@ -375,6 +473,43 @@ describe('extractUniqueMediaTypes', () => {
 	});
 });
 
+describe('extractUniqueFocusLevels', () => {
+	it('extracts unique focus levels as display labels in order', () => {
+		const checkins: Checkin[] = [
+			createCheckin({ focus: 'sleep' }),
+			createCheckin({ focus: 'distracted' }),
+			createCheckin({ focus: 'focused' }),
+			createCheckin({ focus: 'distracted' })
+		];
+
+		const result = extractUniqueFocusLevels(checkins);
+		expect(result).toEqual(['Focused', 'Second Screening', 'Sleep']);
+	});
+
+	it('treats null/undefined focus as focused', () => {
+		const checkins: Checkin[] = [
+			createCheckin({ focus: null }),
+			createCheckin({ focus: undefined }),
+			createCheckin({ focus: 'distracted' })
+		];
+
+		const result = extractUniqueFocusLevels(checkins);
+		expect(result).toEqual(['Focused', 'Second Screening']);
+	});
+
+	it('returns all focus levels when all present', () => {
+		const checkins: Checkin[] = [
+			createCheckin({ focus: 'focused' }),
+			createCheckin({ focus: 'distracted' }),
+			createCheckin({ focus: 'background' }),
+			createCheckin({ focus: 'sleep' })
+		];
+
+		const result = extractUniqueFocusLevels(checkins);
+		expect(result).toEqual(['Focused', 'Second Screening', 'Background', 'Sleep']);
+	});
+});
+
 describe('groupByDay', () => {
 	it('groups checkins by day', () => {
 		const checkins: Checkin[] = [
@@ -402,7 +537,7 @@ describe('groupByDay', () => {
 describe('hasActiveFilters', () => {
 	it('returns false when no filters are active', () => {
 		expect(hasActiveFilters({})).toBe(false);
-		expect(hasActiveFilters({ locations: [], people: [], mediaTypes: [] })).toBe(false);
+		expect(hasActiveFilters({ locations: [], people: [], mediaTypes: [], focusLevels: [] })).toBe(false);
 	});
 
 	it('returns true when searchQuery is set', () => {
@@ -427,5 +562,9 @@ describe('hasActiveFilters', () => {
 
 	it('returns true when mediaTypes are selected', () => {
 		expect(hasActiveFilters({ mediaTypes: ['Film'] })).toBe(true);
+	});
+
+	it('returns true when focusLevels are selected', () => {
+		expect(hasActiveFilters({ focusLevels: ['Second Screening'] })).toBe(true);
 	});
 });
