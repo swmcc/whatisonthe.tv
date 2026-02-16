@@ -220,6 +220,7 @@ async def create_checkin(
         location=checkin_data.location,
         watched_with=checkin_data.watched_with,
         notes=checkin_data.notes,
+        focus=checkin_data.focus,
     )
 
     db.add(checkin)
