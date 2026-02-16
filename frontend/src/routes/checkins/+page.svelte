@@ -21,6 +21,7 @@
 	let selectedLocations: string[] = [];
 	let selectedPeople: string[] = [];
 	let selectedMediaTypes: string[] = [];
+	let selectedFocusLevels: string[] = [];
 	let showEditModal = false;
 	let editingCheckin: any = null;
 	let showSwansonModal = false;
@@ -37,6 +38,23 @@
 	$: uniqueMediaTypes = [...new Set(checkins.map(c => c.content?.content_type).filter(Boolean))].sort() as string[];
 	$: mediaTypeOptions = uniqueMediaTypes.map(type => mediaTypeLabels[type] || type);
 
+	// Focus level options with display labels
+	const focusLevelLabels: Record<string, string> = {
+		'focused': 'Focused',
+		'distracted': 'Second Screening',
+		'background': 'Background',
+		'sleep': 'Sleep'
+	};
+	const focusLevelOrder = ['focused', 'distracted', 'background', 'sleep'];
+	$: uniqueFocusLevels = (() => {
+		const levels = new Set<string>();
+		for (const c of checkins) {
+			levels.add(c.focus || 'focused');
+		}
+		return [...levels].sort((a, b) => focusLevelOrder.indexOf(a) - focusLevelOrder.indexOf(b));
+	})();
+	$: focusLevelOptions = uniqueFocusLevels.map(level => focusLevelLabels[level] || level);
+
 	// Clean up selected values if they're no longer valid options
 	$: if (uniqueLocations.length > 0) {
 		selectedLocations = selectedLocations.filter(s => uniqueLocations.includes(s));
@@ -47,11 +65,22 @@
 	$: if (mediaTypeOptions.length > 0) {
 		selectedMediaTypes = selectedMediaTypes.filter(s => mediaTypeOptions.includes(s));
 	}
+	$: if (focusLevelOptions.length > 0) {
+		selectedFocusLevels = selectedFocusLevels.filter(s => focusLevelOptions.includes(s));
+	}
 
 	// Helper to convert display label back to content_type
 	function labelToContentType(label: string): string {
 		for (const [type, displayLabel] of Object.entries(mediaTypeLabels)) {
 			if (displayLabel === label) return type;
+		}
+		return label;
+	}
+
+	// Helper to convert display label back to focus level
+	function labelToFocusLevel(label: string): string {
+		for (const [level, displayLabel] of Object.entries(focusLevelLabels)) {
+			if (displayLabel === label) return level;
 		}
 		return label;
 	}
@@ -123,6 +152,15 @@
 			if (!contentType) return false;
 			const selectedContentTypes = selectedMediaTypes.map(labelToContentType);
 			if (!selectedContentTypes.includes(contentType)) {
+				return false;
+			}
+		}
+
+		// Focus level filter
+		if (selectedFocusLevels.length > 0) {
+			const selectedLevels = selectedFocusLevels.map(labelToFocusLevel);
+			const checkinFocus = checkin.focus || 'focused';
+			if (!selectedLevels.includes(checkinFocus)) {
 				return false;
 			}
 		}
@@ -298,8 +336,8 @@
 			/>
 		</div>
 
-		<!-- Location, People & Media Type Filters -->
-		<div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+		<!-- Location, People, Media Type & Focus Filters -->
+		<div class="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
 			<MultiSelectFilter
 				label="Where"
 				icon="location"
@@ -321,10 +359,17 @@
 				bind:selected={selectedMediaTypes}
 				on:change={(e) => selectedMediaTypes = e.detail.selected}
 			/>
+			<MultiSelectFilter
+				label="Focus"
+				icon="focus"
+				options={focusLevelOptions}
+				bind:selected={selectedFocusLevels}
+				on:change={(e) => selectedFocusLevels = e.detail.selected}
+			/>
 		</div>
 
 		<!-- Clear All Filters -->
-		{#if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0 || selectedMediaTypes.length > 0}
+		{#if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0 || selectedMediaTypes.length > 0 || selectedFocusLevels.length > 0}
 			<div class="mt-3">
 				<button
 					on:click={() => {
@@ -334,6 +379,7 @@
 						selectedLocations = [];
 						selectedPeople = [];
 						selectedMediaTypes = [];
+						selectedFocusLevels = [];
 					}}
 					class="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
 				>
@@ -373,11 +419,11 @@
 					</div>
 				{/if}
 			</div>
-			{#if (searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0 || selectedMediaTypes.length > 0) && filteredCheckins.length === 0 && !loading}
+			{#if (searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0 || selectedMediaTypes.length > 0 || selectedFocusLevels.length > 0) && filteredCheckins.length === 0 && !loading}
 				<p class="mt-2 text-sm text-gray-500">
 					No check-ins found matching your filters
 				</p>
-			{:else if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0 || selectedMediaTypes.length > 0}
+			{:else if searchQuery || startDateFilter || endDateFilter || selectedLocations.length > 0 || selectedPeople.length > 0 || selectedMediaTypes.length > 0 || selectedFocusLevels.length > 0}
 				<p class="mt-2 text-sm text-gray-500">
 					Found {filteredCheckins.length} check-in{filteredCheckins.length !== 1 ? 's' : ''}
 					{#if searchQuery}
@@ -394,6 +440,9 @@
 					{/if}
 					{#if selectedMediaTypes.length > 0}
 						({selectedMediaTypes.length === 1 ? selectedMediaTypes[0] : `${selectedMediaTypes.length} types`})
+					{/if}
+					{#if selectedFocusLevels.length > 0}
+						[{selectedFocusLevels.length === 1 ? selectedFocusLevels[0] : `${selectedFocusLevels.length} focus levels`}]
 					{/if}
 				</p>
 			{/if}
@@ -546,6 +595,26 @@
 											</div>
 										{/if}
 
+										{#if checkin.focus && checkin.focus !== 'focused'}
+											<div class="flex items-center text-sm text-gray-600">
+												<svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+													/>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+													/>
+												</svg>
+												{focusLevelLabels[checkin.focus] || checkin.focus}
+											</div>
+										{/if}
+
 										{#if checkin.notes}
 											<div class="mt-2 text-sm text-gray-700 italic">
 												"{checkin.notes}"
@@ -645,7 +714,8 @@
 			watched_at: editingCheckin.watched_at,
 			location: editingCheckin.location,
 			watched_with: editingCheckin.watched_with,
-			notes: editingCheckin.notes
+			notes: editingCheckin.notes,
+			focus: editingCheckin.focus
 		}}
 		on:success={handleEditSuccess}
 		on:close={() => { showEditModal = false; editingCheckin = null; }}
