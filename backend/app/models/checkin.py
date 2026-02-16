@@ -1,12 +1,22 @@
 """Checkin model."""
 
+import enum
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+
+
+class FocusLevel(str, enum.Enum):
+    """Focus level during viewing."""
+
+    FOCUSED = "focused"
+    DISTRACTED = "distracted"
+    BACKGROUND = "background"
+    SLEEP = "sleep"
 
 
 class Checkin(Base):
@@ -30,6 +40,9 @@ class Checkin(Base):
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     watched_with: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    focus: Mapped[Optional[FocusLevel]] = mapped_column(
+        Enum(FocusLevel, name="focuslevel", create_type=False), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )
