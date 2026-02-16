@@ -2,12 +2,15 @@
  * Checkin filtering utilities for advanced search functionality.
  */
 
+export type FocusLevel = 'focused' | 'distracted' | 'background' | 'sleep';
+
 export interface Checkin {
 	id: number;
 	watched_at: string;
 	location?: string | null;
 	watched_with?: string | null;
 	notes?: string | null;
+	focus?: FocusLevel | null;
 	content?: {
 		name?: string;
 		content_type?: string;
@@ -24,12 +27,21 @@ export interface FilterOptions {
 	locations?: string[];
 	people?: string[];
 	mediaTypes?: string[];
+	focusLevels?: string[];
 }
 
 // Media type labels mapping
 export const MEDIA_TYPE_LABELS: Record<string, string> = {
 	movie: 'Film',
 	series: 'TV Series'
+};
+
+// Focus level labels mapping
+export const FOCUS_LEVEL_LABELS: Record<FocusLevel, string> = {
+	focused: 'Focused',
+	distracted: 'Second Screening',
+	background: 'Background',
+	sleep: 'Sleep'
 };
 
 /**
@@ -47,6 +59,23 @@ export function labelToContentType(label: string): string {
  */
 export function contentTypeToLabel(contentType: string): string {
 	return MEDIA_TYPE_LABELS[contentType] || contentType;
+}
+
+/**
+ * Convert a display label back to focus level value.
+ */
+export function labelToFocusLevel(label: string): string {
+	for (const [level, displayLabel] of Object.entries(FOCUS_LEVEL_LABELS)) {
+		if (displayLabel === label) return level;
+	}
+	return label;
+}
+
+/**
+ * Convert a focus level value to display label.
+ */
+export function focusLevelToLabel(focusLevel: string): string {
+	return FOCUS_LEVEL_LABELS[focusLevel as FocusLevel] || focusLevel;
 }
 
 /**
@@ -133,6 +162,20 @@ export function filterByMediaTypes(checkin: Checkin, mediaTypes: string[]): bool
 }
 
 /**
+ * Filter checkins by focus level.
+ * Accepts display labels and converts them to focus level values.
+ */
+export function filterByFocusLevels(checkin: Checkin, focusLevels: string[]): boolean {
+	if (!focusLevels || focusLevels.length === 0) return true;
+
+	const selectedFocusLevels = focusLevels.map(labelToFocusLevel);
+
+	// Null/undefined focus is treated as 'focused' (full attention)
+	const checkinFocus = checkin.focus || 'focused';
+	return selectedFocusLevels.includes(checkinFocus);
+}
+
+/**
  * Apply all filters to a single checkin.
  */
 export function applyFilters(checkin: Checkin, options: FilterOptions): boolean {
@@ -141,6 +184,7 @@ export function applyFilters(checkin: Checkin, options: FilterOptions): boolean 
 	if (!filterByLocations(checkin, options.locations || [])) return false;
 	if (!filterByPeople(checkin, options.people || [])) return false;
 	if (!filterByMediaTypes(checkin, options.mediaTypes || [])) return false;
+	if (!filterByFocusLevels(checkin, options.focusLevels || [])) return false;
 	return true;
 }
 
@@ -176,6 +220,28 @@ export function extractUniqueMediaTypes(checkins: Checkin[]): string[] {
 }
 
 /**
+ * Extract unique focus levels from checkins and convert to display labels.
+ * Always includes 'Focused' since null/undefined focus means focused.
+ */
+export function extractUniqueFocusLevels(checkins: Checkin[]): string[] {
+	const levels = new Set<string>();
+
+	for (const checkin of checkins) {
+		// Null/undefined focus is treated as 'focused'
+		const focus = checkin.focus || 'focused';
+		levels.add(focus);
+	}
+
+	// Sort by the order in FOCUS_LEVEL_LABELS
+	const order: FocusLevel[] = ['focused', 'distracted', 'background', 'sleep'];
+	const sortedLevels = [...levels].sort((a, b) => {
+		return order.indexOf(a as FocusLevel) - order.indexOf(b as FocusLevel);
+	});
+
+	return sortedLevels.map(focusLevelToLabel);
+}
+
+/**
  * Group checkins by day.
  */
 export function groupByDay(checkins: Checkin[]): Map<string, Checkin[]> {
@@ -208,6 +274,7 @@ export function hasActiveFilters(options: FilterOptions): boolean {
 		options.endDate ||
 		(options.locations && options.locations.length > 0) ||
 		(options.people && options.people.length > 0) ||
-		(options.mediaTypes && options.mediaTypes.length > 0)
+		(options.mediaTypes && options.mediaTypes.length > 0) ||
+		(options.focusLevels && options.focusLevels.length > 0)
 	);
 }
