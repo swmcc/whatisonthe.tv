@@ -16,7 +16,17 @@
 		location?: string;
 		watched_with?: string;
 		notes?: string;
+		focus?: 'focused' | 'distracted' | 'background' | 'sleep' | null;
 	} = {};
+
+	type FocusLevel = 'focused' | 'distracted' | 'background' | 'sleep';
+
+	const focusOptions: { value: FocusLevel | ''; label: string; description: string }[] = [
+		{ value: '', label: 'Full attention', description: 'Default - actually watching' },
+		{ value: 'distracted', label: 'Second screening', description: 'Multitasking while watching' },
+		{ value: 'background', label: 'Background', description: 'On but not really watching' },
+		{ value: 'sleep', label: 'Sleep', description: 'Put on to fall asleep to' }
+	];
 
 	const dispatch = createEventDispatcher();
 
@@ -26,6 +36,7 @@
 	let location = existingData.location || '';
 	let watchedWith = existingData.watched_with || '';
 	let notes = existingData.notes || '';
+	let focus: FocusLevel | '' = existingData.focus || '';
 	let loading = false;
 	let error = '';
 	let success = false;
@@ -48,7 +59,8 @@
 					watched_at: new Date(watchedAt).toISOString(),
 					location: location || undefined,
 					watched_with: watchedWith || undefined,
-					notes: notes || undefined
+					notes: notes || undefined,
+					focus: focus || null
 				});
 			} else {
 				await api.checkin.create({
@@ -57,7 +69,8 @@
 					watched_at: new Date(watchedAt).toISOString(),
 					location: location || undefined,
 					watched_with: watchedWith || undefined,
-					notes: notes || undefined
+					notes: notes || undefined,
+					focus: focus || undefined
 				});
 			}
 
@@ -194,6 +207,25 @@
 					placeholder="Any thoughts or comments?"
 					class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
 				/>
+			</div>
+
+			<!-- Focus Level -->
+			<div class="mb-4">
+				<label for="focus" class="block text-sm font-medium text-gray-700 mb-1"> Focus </label>
+				<select
+					id="focus"
+					bind:value={focus}
+					class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+				>
+					{#each focusOptions as option}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</select>
+				{#if focus}
+					<p class="mt-1 text-xs text-gray-500">
+						{focusOptions.find(o => o.value === focus)?.description || ''}
+					</p>
+				{/if}
 			</div>
 
 			<!-- Footer -->
