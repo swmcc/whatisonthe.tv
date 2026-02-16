@@ -1,9 +1,19 @@
 """Checkin schemas."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+
+class FocusLevel(str, Enum):
+    """Focus level during viewing."""
+
+    FOCUSED = "focused"
+    DISTRACTED = "distracted"
+    BACKGROUND = "background"
+    SLEEP = "sleep"
 
 
 class CheckinBase(BaseModel):
@@ -15,6 +25,7 @@ class CheckinBase(BaseModel):
     location: Optional[str] = Field(None, max_length=255, description="Where the content was watched")
     watched_with: Optional[str] = Field(None, max_length=255, description="Who the content was watched with")
     notes: Optional[str] = Field(None, description="Additional notes about the viewing")
+    focus: Optional[FocusLevel] = Field(None, description="Focus level during viewing (focused, distracted, background, sleep)")
 
 
 class CheckinCreate(CheckinBase):
@@ -30,6 +41,7 @@ class CheckinUpdate(BaseModel):
     location: Optional[str] = Field(None, max_length=255)
     watched_with: Optional[str] = Field(None, max_length=255)
     notes: Optional[str] = None
+    focus: Optional[FocusLevel] = None
 
 
 class ContentSummary(BaseModel):
