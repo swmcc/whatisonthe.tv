@@ -75,7 +75,8 @@ local.db.pull: ## Pull production database from Heroku
 	heroku pg:backups:capture --app whatisonthe-tv
 	heroku pg:backups:download --app whatisonthe-tv -o /tmp/heroku_db.dump
 	@echo "$(YELLOW)==> Restoring to local database...$(RESET)"
-	pg_restore --verbose --clean --no-acl --no-owner -U watchlog -d watchlog /tmp/heroku_db.dump || true
+	docker run --rm -v /tmp/heroku_db.dump:/tmp/heroku_db.dump postgres:17-alpine \
+		pg_restore --verbose --clean --no-acl --no-owner -h host.docker.internal -U $(USER) -d watchlog /tmp/heroku_db.dump || true
 	rm /tmp/heroku_db.dump
 	@echo "$(GREEN)✅ Production database pulled successfully$(RESET)"
 
@@ -135,6 +136,28 @@ clean: ## Clean up cache and generated files
 	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name ".coverage" -delete
 	@echo "$(GREEN)✅ Cleaned up cache files$(RESET)"
+
+# -----------------------------
+# 🚀 Production (Heroku)
+# -----------------------------
+
+production.logs: ## Tail Heroku production logs
+	heroku logs --tail --app whatisonthe-tv
+
+production.logs.web: ## Tail Heroku web dyno logs only
+	heroku logs --tail --app whatisonthe-tv --dyno web
+
+production.logs.worker: ## Tail Heroku worker dyno logs only
+	heroku logs --tail --app whatisonthe-tv --dyno worker
+
+production.console: ## Open Rails console on Heroku
+	heroku run python -c "from app.main import *" --app whatisonthe-tv
+
+production.bash: ## Open bash shell on Heroku
+	heroku run bash --app whatisonthe-tv
+
+production.db.psql: ## Connect to Heroku PostgreSQL
+	heroku pg:psql --app whatisonthe-tv
 
 # -----------------------------
 # 🧰 Meta
