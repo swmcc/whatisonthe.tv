@@ -41,7 +41,8 @@ class Checkin(Base):
     watched_with: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     focus: Mapped[Optional[FocusLevel]] = mapped_column(
-        Enum(FocusLevel, name="focuslevel", create_type=False), nullable=True
+        Enum(FocusLevel, name="focuslevel", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
