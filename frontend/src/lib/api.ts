@@ -140,6 +140,11 @@ export const api = {
 			return request(`/series/${id}/season/${seasonNumber}/episodes`, {
 				requiresAuth: true
 			});
+		},
+		getSyncStatus: async (id: number) => {
+			return request(`/series/${id}/sync-status`, {
+				requiresAuth: true
+			});
 		}
 	},
 	checkin: {
