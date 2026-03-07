@@ -314,10 +314,14 @@ def _save_credits(db, content: Content, characters_data: list):
                 full_name=person_name,
                 first_name=first_name,
                 last_name=last_name,
+                image_url=char_data.get("personImgURL"),
                 last_synced_at=None  # Mark as needing sync
             )
             db.add(person)
             db.flush()
+        elif not person.image_url and char_data.get("personImgURL"):
+            # Update existing person's image if missing
+            person.image_url = char_data.get("personImgURL")
 
         # Create credit
         role_type_map = {

@@ -4,6 +4,7 @@
 	import { api } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import CheckInModal from '$lib/components/CheckInModal.svelte';
+	import WatchlistButton from '$lib/components/WatchlistButton.svelte';
 
 	let loading = true;
 	let error = '';
@@ -300,17 +301,18 @@
 						</div>
 					{/if}
 
-					<!-- Check-in Button -->
-					<div class="mt-6">
+					<!-- Action Buttons -->
+					<div class="mt-6 flex flex-col sm:flex-row gap-3">
 						<button
 							on:click={() => openCheckInModal()}
-							class="w-full px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+							class="flex-1 px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
 						>
 							<svg class="w-5 h-5 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 							</svg>
 							Check In {isSeries ? 'Show' : 'Movie'}
 						</button>
+						<WatchlistButton type="content" id={parseInt(id)} />
 					</div>
 				</div>
 			</div>

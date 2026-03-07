@@ -15,6 +15,16 @@ from app.schemas.checkin import (
     ContentSummary,
     EpisodeSummary,
 )
+from app.schemas.watchlist import (
+    WatchlistCheckResponse,
+    WatchlistContentCreate,
+    WatchlistContentUpdate,
+    WatchlistItemResponse,
+    WatchlistItemType,
+    WatchlistPersonCreate,
+    WatchlistPersonUpdate,
+    PersonRoleFilter,
+)
 
 __all__ = [
     "LoginRequest",
@@ -28,4 +38,12 @@ __all__ = [
     "CheckinUpdate",
     "ContentSummary",
     "EpisodeSummary",
+    "WatchlistCheckResponse",
+    "WatchlistContentCreate",
+    "WatchlistContentUpdate",
+    "WatchlistItemResponse",
+    "WatchlistItemType",
+    "WatchlistPersonCreate",
+    "WatchlistPersonUpdate",
+    "PersonRoleFilter",
 ]

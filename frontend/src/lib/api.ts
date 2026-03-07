@@ -209,6 +209,80 @@ export const api = {
 			});
 		}
 	},
+	watchlist: {
+		list: async (itemType?: 'content' | 'person') => {
+			const params = new URLSearchParams();
+			if (itemType) {
+				params.append('item_type', itemType);
+			}
+			const queryString = params.toString();
+			return request(`/watchlist${queryString ? `?${queryString}` : ''}`, {
+				requiresAuth: true
+			});
+		},
+		addContent: async (tvdbId: number, notes?: string) => {
+			return request('/watchlist/content', {
+				method: 'POST',
+				body: JSON.stringify({ tvdb_id: tvdbId, notes }),
+				requiresAuth: true
+			});
+		},
+		addPerson: async (
+			personId: number,
+			personRoleFilter: 'any' | 'actor' | 'director' = 'any',
+			notes?: string
+		) => {
+			return request('/watchlist/person', {
+				method: 'POST',
+				body: JSON.stringify({
+					person_id: personId,
+					person_role_filter: personRoleFilter,
+					notes
+				}),
+				requiresAuth: true
+			});
+		},
+		updateContent: async (tvdbId: number, notes?: string) => {
+			return request(`/watchlist/content/${tvdbId}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ notes }),
+				requiresAuth: true
+			});
+		},
+		updatePerson: async (
+			personId: number,
+			personRoleFilter?: 'any' | 'actor' | 'director',
+			notes?: string
+		) => {
+			return request(`/watchlist/person/${personId}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ person_role_filter: personRoleFilter, notes }),
+				requiresAuth: true
+			});
+		},
+		removeContent: async (tvdbId: number) => {
+			return request(`/watchlist/content/${tvdbId}`, {
+				method: 'DELETE',
+				requiresAuth: true
+			});
+		},
+		removePerson: async (personId: number) => {
+			return request(`/watchlist/person/${personId}`, {
+				method: 'DELETE',
+				requiresAuth: true
+			});
+		},
+		checkContent: async (tvdbId: number) => {
+			return request(`/watchlist/check/content/${tvdbId}`, {
+				requiresAuth: true
+			});
+		},
+		checkPerson: async (personId: number) => {
+			return request(`/watchlist/check/person/${personId}`, {
+				requiresAuth: true
+			});
+		}
+	},
 	swanson: {
 		recommend: async (data: {
 			prompt: string;

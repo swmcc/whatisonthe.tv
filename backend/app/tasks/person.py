@@ -114,3 +114,29 @@ def _log_sync_failure(db, tvdb_id: int, error_message: str):
         error_message=error_message
     )
     db.add(log)
+
+
+@celery_app.task
+def backfill_person_images():
+    """
+    Backfill missing person images by fetching from TVDB.
+
+    Queues save_person_full tasks for all persons without image_url.
+    Run with: celery -A app.workers.celery_app call app.tasks.person.backfill_person_images
+    """
+    with SyncSessionLocal() as db:
+        # Find all persons without images
+        stmt = select(Person).where(Person.image_url.is_(None))
+        result = db.execute(stmt)
+        persons = result.scalars().all()
+
+        queued = 0
+        for person in persons:
+            save_person_full.delay(person.tvdb_id)
+            queued += 1
+
+        return {
+            "status": "success",
+            "queued": queued,
+            "message": f"Queued {queued} persons for image sync."
+        }

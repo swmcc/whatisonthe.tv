@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import WatchlistButton from '$lib/components/WatchlistButton.svelte';
 
 	let loading = true;
 	let error = '';
@@ -163,7 +164,10 @@
 
 				<!-- Info -->
 				<div class="md:w-2/3 lg:w-3/4 p-6">
-					<h1 class="text-4xl font-bold text-gray-900 mb-4">{data.name}</h1>
+					<div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+						<h1 class="text-4xl font-bold text-gray-900">{data.name}</h1>
+						<WatchlistButton type="person" id={parseInt(id)} personRoleFilter="any" />
+					</div>
 
 					<!-- Aliases -->
 					{#if data.aliases && getEnglishAliases(data.aliases).length > 0}
