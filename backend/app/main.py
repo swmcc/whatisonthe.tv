@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.api import auth, checkin, search, swanson, watchlist
+from app.api import auth, checkin, search, swanson, watchlist, watchlist_updates
 from app.core.config import settings
 from app.db.redis import close_redis, get_redis
 
@@ -50,12 +50,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routers
-app.include_router(auth.router)
-app.include_router(search.router, tags=["search"])
-app.include_router(checkin.router)
-app.include_router(swanson.router)
-app.include_router(watchlist.router)
+# Include API routers with /api prefix to avoid conflicts with frontend routes
+app.include_router(auth.router, prefix="/api")
+app.include_router(search.router, prefix="/api", tags=["search"])
+app.include_router(checkin.router, prefix="/api")
+app.include_router(swanson.router, prefix="/api")
+app.include_router(watchlist_updates.router, prefix="/api")
+app.include_router(watchlist.router, prefix="/api")
 
 
 @app.get("/health")

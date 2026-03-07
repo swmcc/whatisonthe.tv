@@ -24,16 +24,35 @@ export class AuthenticationError extends Error {
 async function request(endpoint: string, options: RequestOptions = {}) {
 	const { requiresAuth = false, ...fetchOptions } = options;
 
-	const headers: HeadersInit = {
-		'Content-Type': 'application/json',
-		...(fetchOptions.headers || {})
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json'
 	};
 
+	// Merge any additional headers from options
+	if (fetchOptions.headers) {
+		const additionalHeaders = fetchOptions.headers as Record<string, string>;
+		Object.assign(headers, additionalHeaders);
+	}
+
 	if (requiresAuth) {
-		const authState = get(auth);
+		// Read token directly from localStorage as primary source
+		let token: string | null = null;
+		if (browser) {
+			token = localStorage.getItem('token');
+		}
+
+		// Fallback to store if localStorage didn't work
+		if (!token) {
+			const authState = get(auth);
+			token = authState.token;
+		}
+
+		console.log('[API] requiresAuth request to:', endpoint);
+		console.log('[API] token exists:', !!token);
 
 		// Check if token is expired before making the request
-		if (!authState.token || isTokenExpired(authState.token)) {
+		if (!token || isTokenExpired(token)) {
+			console.log('[API] Token missing or expired');
 			auth.handleAuthError();
 			if (browser) {
 				goto('/login');
@@ -41,13 +60,20 @@ async function request(endpoint: string, options: RequestOptions = {}) {
 			throw new AuthenticationError();
 		}
 
-		headers['Authorization'] = `Bearer ${authState.token}`;
+		headers['Authorization'] = `Bearer ${token}`;
+		console.log('[API] Authorization header set');
 	}
 
-	const response = await fetch(`${API_URL}${endpoint}`, {
+	const url = `${API_URL}${endpoint}`;
+	console.log('[API] Fetching:', url);
+	console.log('[API] Headers:', JSON.stringify(headers));
+
+	const response = await fetch(url, {
 		...fetchOptions,
 		headers
 	});
+
+	console.log('[API] Response status:', response.status);
 
 	// Handle 401 Unauthorized globally
 	if (response.status === 401) {
@@ -63,42 +89,47 @@ async function request(endpoint: string, options: RequestOptions = {}) {
 		throw new Error(error.detail || `HTTP error ${response.status}`);
 	}
 
+	// Handle 204 No Content responses
+	if (response.status === 204) {
+		return null;
+	}
+
 	return response.json();
 }
 
 export const api = {
 	auth: {
 		login: async (email: string, password: string) => {
-			return request('/auth/login', {
+			return request('/api/auth/login', {
 				method: 'POST',
 				body: JSON.stringify({ email, password })
 			});
 		},
 		logout: async () => {
-			return request('/auth/logout', {
+			return request('/api/auth/logout', {
 				method: 'POST',
 				requiresAuth: true
 			});
 		},
 		me: async () => {
-			return request('/auth/me', {
+			return request('/api/auth/me', {
 				requiresAuth: true
 			});
 		},
 		getPublicUser: async (username: string) => {
-			return request(`/auth/user/${username}`, {
+			return request(`/api/auth/user/${username}`, {
 				requiresAuth: false
 			});
 		},
 		updateProfile: async (data: { username?: string | null; first_name?: string; last_name?: string }) => {
-			return request('/auth/me', {
+			return request('/api/auth/me', {
 				method: 'PATCH',
 				body: JSON.stringify(data),
 				requiresAuth: true
 			});
 		},
 		updatePassword: async (current_password: string, new_password: string) => {
-			return request('/auth/me/password', {
+			return request('/api/auth/me/password', {
 				method: 'POST',
 				body: JSON.stringify({ current_password, new_password }),
 				requiresAuth: true
@@ -107,37 +138,37 @@ export const api = {
 	},
 	search: {
 		query: async (q: string, limit: number = 20, offset: number = 0) => {
-			return request(`/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`, {
+			return request(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`, {
 				requiresAuth: true
 			});
 		},
 		getSeries: async (id: number) => {
-			return request(`/series/${id}`, {
+			return request(`/api/series/${id}`, {
 				requiresAuth: true
 			});
 		},
 		getMovie: async (id: number) => {
-			return request(`/movie/${id}`, {
+			return request(`/api/movie/${id}`, {
 				requiresAuth: true
 			});
 		},
 		getPerson: async (id: number) => {
-			return request(`/person/${id}`, {
+			return request(`/api/person/${id}`, {
 				requiresAuth: true
 			});
 		},
 		getSeriesSeasons: async (id: number) => {
-			return request(`/series/${id}/seasons`, {
+			return request(`/api/series/${id}/seasons`, {
 				requiresAuth: true
 			});
 		},
 		getSeriesEpisodes: async (id: number) => {
-			return request(`/series/${id}/episodes`, {
+			return request(`/api/series/${id}/episodes`, {
 				requiresAuth: true
 			});
 		},
 		getSeasonEpisodes: async (id: number, seasonNumber: number) => {
-			return request(`/series/${id}/season/${seasonNumber}/episodes`, {
+			return request(`/api/series/${id}/season/${seasonNumber}/episodes`, {
 				requiresAuth: true
 			});
 		}
@@ -152,7 +183,7 @@ export const api = {
 			notes?: string;
 			focus?: 'focused' | 'distracted' | 'background' | 'sleep';
 		}) => {
-			return request('/checkins', {
+			return request('/api/checkins', {
 				method: 'POST',
 				body: JSON.stringify(data),
 				requiresAuth: true
@@ -163,7 +194,7 @@ export const api = {
 			if (beforeDate) {
 				params.append('before_date', beforeDate);
 			}
-			return request(`/checkins?${params.toString()}`, {
+			return request(`/api/checkins?${params.toString()}`, {
 				requiresAuth: true
 			});
 		},
@@ -172,12 +203,12 @@ export const api = {
 			if (beforeDate) {
 				params.append('before_date', beforeDate);
 			}
-			return request(`/checkins/user/${username}?${params.toString()}`, {
+			return request(`/api/checkins/user/${username}?${params.toString()}`, {
 				requiresAuth: false
 			});
 		},
 		get: async (id: number) => {
-			return request(`/checkins/${id}`, {
+			return request(`/api/checkins/${id}`, {
 				requiresAuth: true
 			});
 		},
@@ -191,20 +222,20 @@ export const api = {
 				focus?: 'focused' | 'distracted' | 'background' | 'sleep' | null;
 			}
 		) => {
-			return request(`/checkins/${id}`, {
+			return request(`/api/checkins/${id}`, {
 				method: 'PATCH',
 				body: JSON.stringify(data),
 				requiresAuth: true
 			});
 		},
 		delete: async (id: number) => {
-			return request(`/checkins/${id}`, {
+			return request(`/api/checkins/${id}`, {
 				method: 'DELETE',
 				requiresAuth: true
 			});
 		},
 		listByContent: async (contentId: number) => {
-			return request(`/checkins/content/${contentId}`, {
+			return request(`/api/checkins/content/${contentId}`, {
 				requiresAuth: true
 			});
 		}
@@ -216,12 +247,12 @@ export const api = {
 				params.append('item_type', itemType);
 			}
 			const queryString = params.toString();
-			return request(`/watchlist${queryString ? `?${queryString}` : ''}`, {
+			return request(`/api/watchlist${queryString ? `?${queryString}` : ''}`, {
 				requiresAuth: true
 			});
 		},
 		addContent: async (tvdbId: number, notes?: string) => {
-			return request('/watchlist/content', {
+			return request('/api/watchlist/content', {
 				method: 'POST',
 				body: JSON.stringify({ tvdb_id: tvdbId, notes }),
 				requiresAuth: true
@@ -232,7 +263,7 @@ export const api = {
 			personRoleFilter: 'any' | 'actor' | 'director' = 'any',
 			notes?: string
 		) => {
-			return request('/watchlist/person', {
+			return request('/api/watchlist/person', {
 				method: 'POST',
 				body: JSON.stringify({
 					person_id: personId,
@@ -243,7 +274,7 @@ export const api = {
 			});
 		},
 		updateContent: async (tvdbId: number, notes?: string) => {
-			return request(`/watchlist/content/${tvdbId}`, {
+			return request(`/api/watchlist/content/${tvdbId}`, {
 				method: 'PATCH',
 				body: JSON.stringify({ notes }),
 				requiresAuth: true
@@ -254,31 +285,58 @@ export const api = {
 			personRoleFilter?: 'any' | 'actor' | 'director',
 			notes?: string
 		) => {
-			return request(`/watchlist/person/${personId}`, {
+			return request(`/api/watchlist/person/${personId}`, {
 				method: 'PATCH',
 				body: JSON.stringify({ person_role_filter: personRoleFilter, notes }),
 				requiresAuth: true
 			});
 		},
 		removeContent: async (tvdbId: number) => {
-			return request(`/watchlist/content/${tvdbId}`, {
+			return request(`/api/watchlist/content/${tvdbId}`, {
 				method: 'DELETE',
 				requiresAuth: true
 			});
 		},
 		removePerson: async (personId: number) => {
-			return request(`/watchlist/person/${personId}`, {
+			return request(`/api/watchlist/person/${personId}`, {
 				method: 'DELETE',
 				requiresAuth: true
 			});
 		},
 		checkContent: async (tvdbId: number) => {
-			return request(`/watchlist/check/content/${tvdbId}`, {
+			return request(`/api/watchlist/check/content/${tvdbId}`, {
 				requiresAuth: true
 			});
 		},
 		checkPerson: async (personId: number) => {
-			return request(`/watchlist/check/person/${personId}`, {
+			return request(`/api/watchlist/check/person/${personId}`, {
+				requiresAuth: true
+			});
+		},
+		// Updates
+		getUpdates: async (unreadOnly: boolean = false, limit: number = 50) => {
+			const params = new URLSearchParams();
+			if (unreadOnly) params.append('unread_only', 'true');
+			if (limit !== 50) params.append('limit', limit.toString());
+			const queryString = params.toString();
+			return request(`/api/watchlist/updates${queryString ? `?${queryString}` : ''}`, {
+				requiresAuth: true
+			});
+		},
+		getUpdatesCount: async () => {
+			return request('/api/watchlist/updates/count', {
+				requiresAuth: true
+			});
+		},
+		markUpdateRead: async (updateId: number) => {
+			return request(`/api/watchlist/updates/${updateId}/read`, {
+				method: 'POST',
+				requiresAuth: true
+			});
+		},
+		markAllUpdatesRead: async () => {
+			return request('/api/watchlist/updates/read-all', {
+				method: 'POST',
 				requiresAuth: true
 			});
 		}
@@ -300,7 +358,7 @@ export const api = {
 			}>;
 			previous_recommendations?: string[];
 		}) => {
-			return request('/swanson/recommend', {
+			return request('/api/swanson/recommend', {
 				method: 'POST',
 				body: JSON.stringify(data),
 				requiresAuth: true
@@ -335,8 +393,8 @@ export const api = {
 				throw new AuthenticationError();
 			}
 
-			console.log('[API] Fetching stream from:', `${API_URL}/swanson/recommend/stream`);
-			const response = await fetch(`${API_URL}/swanson/recommend/stream`, {
+			console.log('[API] Fetching stream from:', `${API_URL}/api/swanson/recommend/stream`);
+			const response = await fetch(`${API_URL}/api/swanson/recommend/stream`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

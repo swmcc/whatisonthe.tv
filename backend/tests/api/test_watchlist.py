@@ -13,47 +13,47 @@ class TestWatchlistEndpoints:
 
     def test_list_watchlist_requires_auth(self):
         """Test that listing watchlist requires authentication."""
-        response = client.get("/watchlist")
+        response = client.get("/api/watchlist")
         # FastAPI returns 403 when no credentials provided with OAuth2
         assert response.status_code in (401, 403)
 
     def test_add_content_requires_auth(self):
         """Test that adding content to watchlist requires authentication."""
-        response = client.post("/watchlist/content", json={"tvdb_id": 123})
+        response = client.post("/api/watchlist/content", json={"tvdb_id": 123})
         assert response.status_code in (401, 403)
 
     def test_add_person_requires_auth(self):
         """Test that adding person to watchlist requires authentication."""
         response = client.post(
-            "/watchlist/person",
+            "/api/watchlist/person",
             json={"person_id": 456, "person_role_filter": "any"}
         )
         assert response.status_code in (401, 403)
 
     def test_remove_content_requires_auth(self):
         """Test that removing content from watchlist requires authentication."""
-        response = client.delete("/watchlist/content/123")
+        response = client.delete("/api/watchlist/content/123")
         assert response.status_code in (401, 403)
 
     def test_remove_person_requires_auth(self):
         """Test that removing person from watchlist requires authentication."""
-        response = client.delete("/watchlist/person/456")
+        response = client.delete("/api/watchlist/person/456")
         assert response.status_code in (401, 403)
 
     def test_check_content_requires_auth(self):
         """Test that checking content in watchlist requires authentication."""
-        response = client.get("/watchlist/check/content/123")
+        response = client.get("/api/watchlist/check/content/123")
         assert response.status_code in (401, 403)
 
     def test_check_person_requires_auth(self):
         """Test that checking person in watchlist requires authentication."""
-        response = client.get("/watchlist/check/person/456")
+        response = client.get("/api/watchlist/check/person/456")
         assert response.status_code in (401, 403)
 
     def test_update_content_requires_auth(self):
         """Test that updating content watchlist entry requires authentication."""
         response = client.patch(
-            "/watchlist/content/123",
+            "/api/watchlist/content/123",
             json={"notes": "Updated notes"}
         )
         assert response.status_code in (401, 403)
@@ -61,7 +61,7 @@ class TestWatchlistEndpoints:
     def test_update_person_requires_auth(self):
         """Test that updating person watchlist entry requires authentication."""
         response = client.patch(
-            "/watchlist/person/456",
+            "/api/watchlist/person/456",
             json={"person_role_filter": "actor"}
         )
         assert response.status_code in (401, 403)

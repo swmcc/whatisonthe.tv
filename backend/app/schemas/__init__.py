@@ -25,6 +25,11 @@ from app.schemas.watchlist import (
     WatchlistPersonUpdate,
     PersonRoleFilter,
 )
+from app.schemas.watchlist_update import (
+    UpdateType,
+    WatchlistUpdateResponse,
+    WatchlistUpdatesCountResponse,
+)
 
 __all__ = [
     "LoginRequest",
@@ -46,4 +51,7 @@ __all__ = [
     "WatchlistPersonCreate",
     "WatchlistPersonUpdate",
     "PersonRoleFilter",
+    "UpdateType",
+    "WatchlistUpdateResponse",
+    "WatchlistUpdatesCountResponse",
 ]
