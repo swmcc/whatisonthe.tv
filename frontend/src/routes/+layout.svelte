@@ -17,7 +17,7 @@
 		const segments = pathname.split('/').filter(s => s.length > 0);
 		if (segments.length !== 1) return false;
 
-		const knownRoutes = ['login', 'about', 'colophon', 'show', 'checkins', 'settings', 'swanson'];
+		const knownRoutes = ['login', 'about', 'colophon', 'show', 'checkins', 'settings', 'swanson', 'watchlist', 'person'];
 		return !knownRoutes.includes(segments[0]);
 	}
 
@@ -96,6 +96,14 @@
 								class:text-indigo-600={$page.url.pathname === '/checkins'}
 							>
 								Check-ins
+							</a>
+							<a
+								href="/watchlist"
+								class="border-transparent text-gray-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium hover:border-indigo-500 transition-colors"
+								class:border-indigo-500={$page.url.pathname === '/watchlist'}
+								class:text-indigo-600={$page.url.pathname === '/watchlist'}
+							>
+								Watchlist
 							</a>
 						</div>
 					</div>
@@ -196,6 +204,17 @@
 							class:text-gray-600={$page.url.pathname !== '/checkins'}
 						>
 							Check-ins
+						</a>
+						<a
+							href="/watchlist"
+							class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+							class:border-indigo-500={$page.url.pathname === '/watchlist'}
+							class:bg-indigo-50={$page.url.pathname === '/watchlist'}
+							class:text-indigo-700={$page.url.pathname === '/watchlist'}
+							class:border-transparent={$page.url.pathname !== '/watchlist'}
+							class:text-gray-600={$page.url.pathname !== '/watchlist'}
+						>
+							Watchlist
 						</a>
 					</div>
 					<div class="pt-4 pb-3 border-t border-gray-200">
