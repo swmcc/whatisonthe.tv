@@ -80,6 +80,11 @@ const initialState: AuthState = {
 	loading: false
 };
 
+if (browser) {
+	console.log('[Auth] Initial state - token exists:', !!initialState.token);
+	console.log('[Auth] localStorage token exists:', !!localStorage.getItem('token'));
+}
+
 function createAuthStore() {
 	const { subscribe, set, update } = writable<AuthState>(initialState);
 
@@ -113,14 +118,27 @@ function createAuthStore() {
 		/**
 		 * Check if the current token is valid (exists and not expired).
 		 * If expired, automatically clears auth state.
+		 * Always reads fresh from localStorage to ensure we have the latest token.
 		 */
 		isValid: (): boolean => {
-			const state = get({ subscribe });
-			if (!state.token) return false;
-			if (isTokenExpired(state.token)) {
+			if (!browser) return false;
+
+			// Always read fresh from localStorage
+			const token = localStorage.getItem('token');
+			if (!token) return false;
+
+			if (isTokenExpired(token)) {
 				logout();
 				return false;
 			}
+
+			// Ensure store state matches localStorage
+			const state = get({ subscribe });
+			if (state.token !== token) {
+				const user = JSON.parse(localStorage.getItem('user') || 'null');
+				set({ user, token, loading: false });
+			}
+
 			return true;
 		},
 		/**

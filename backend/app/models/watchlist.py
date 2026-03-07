@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.content import Content
     from app.models.person import Person
     from app.models.user import User
+    from app.models.watchlist_update import WatchlistUpdate
 
 
 class WatchlistItemType(str, Enum):
@@ -94,6 +95,12 @@ class WatchlistItem(Base):
     user: Mapped["User"] = relationship("User", back_populates="watchlist_items")
     content: Mapped["Content | None"] = relationship("Content", lazy="selectin")
     person: Mapped["Person | None"] = relationship("Person", lazy="selectin")
+    updates: Mapped[list["WatchlistUpdate"]] = relationship(
+        "WatchlistUpdate",
+        back_populates="watchlist_item",
+        cascade="all, delete-orphan",
+        order_by="WatchlistUpdate.created_at.desc()"
+    )
 
     # Indexes and constraints
     __table_args__ = (

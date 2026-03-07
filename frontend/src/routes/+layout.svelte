@@ -1,12 +1,19 @@
 <script lang="ts">
 	import '../app.css';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth';
 	import { api } from '$lib/api';
+	import { updates } from '$lib/stores/updates';
 
 	let menuOpen = false;
+	let updatesOpen = false;
+	let updatesLoading = false;
+
+	// Subscribe to store
+	$: recentUpdates = $updates;
+	$: unreadUpdatesCount = $updates.length;
 
 	// List of public routes that don't require authentication
 	const publicRoutes = ['/login', '/about', '/colophon'];
@@ -21,6 +28,47 @@
 		return !knownRoutes.includes(segments[0]);
 	}
 
+	// Load updates into store
+	async function loadUpdates() {
+		if (updatesLoading) return;
+		updatesLoading = true;
+		try {
+			await updates.load(true, 10);
+		} finally {
+			updatesLoading = false;
+		}
+	}
+
+	// Toggle updates dropdown
+	async function toggleUpdates() {
+		updatesOpen = !updatesOpen;
+		menuOpen = false; // Close user menu if open
+		if (updatesOpen) {
+			// Always fetch fresh data when opening
+			await loadUpdates();
+		}
+	}
+
+	// Mark update as read
+	async function markAsRead(updateId: number) {
+		await updates.markAsRead(updateId);
+	}
+
+	// Format relative time
+	function formatRelativeTime(dateStr: string): string {
+		const date = new Date(dateStr);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const diffMins = Math.floor(diffMs / 60000);
+		const diffHours = Math.floor(diffMs / 3600000);
+		const diffDays = Math.floor(diffMs / 86400000);
+
+		if (diffMins < 60) return `${diffMins}m ago`;
+		if (diffHours < 24) return `${diffHours}h ago`;
+		if (diffDays < 7) return `${diffDays}d ago`;
+		return date.toLocaleDateString();
+	}
+
 	// Check authentication on mount - validate token and redirect to login if invalid
 	onMount(async () => {
 		const isPublic = publicRoutes.includes($page.url.pathname) || isPublicProfilePage($page.url.pathname);
@@ -30,15 +78,25 @@
 			goto('/login');
 		}
 
-		// Close menu on ESC key
+		// Load updates into store and start polling
+		await loadUpdates();
+		updates.startPolling(30000); // Poll every 30 seconds
+
+		// Close menus on ESC key
 		function handleKeydown(event: KeyboardEvent) {
-			if (event.key === 'Escape' && menuOpen) {
+			if (event.key === 'Escape') {
 				menuOpen = false;
+				updatesOpen = false;
 			}
 		}
 
 		window.addEventListener('keydown', handleKeydown);
 		return () => window.removeEventListener('keydown', handleKeydown);
+	});
+
+	// Stop polling on destroy
+	onDestroy(() => {
+		updates.stopPolling();
 	});
 
 	// Reactive: redirect to home if authenticated and on login page
@@ -47,9 +105,10 @@
 		goto('/');
 	}
 
-	// Close menu when navigating to a different page
+	// Close menus when navigating to a different page
 	$: if ($page.url.pathname) {
 		menuOpen = false;
+		updatesOpen = false;
 	}
 
 	async function handleLogout() {
@@ -108,7 +167,96 @@
 						</div>
 					</div>
 
-					<div class="hidden sm:ml-6 sm:flex sm:items-center">
+					<div class="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
+						<!-- Updates notification bell -->
+						{#if unreadUpdatesCount > 0}
+							<div class="relative">
+								<button
+									on:click={toggleUpdates}
+									class="relative p-1 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-full"
+									title="Watchlist updates"
+								>
+									<span class="sr-only">View watchlist updates</span>
+									<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+									</svg>
+									<span class="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs font-medium">
+										{unreadUpdatesCount > 9 ? '9+' : unreadUpdatesCount}
+									</span>
+								</button>
+
+								{#if updatesOpen}
+									<div class="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20">
+										<div class="py-2">
+											<div class="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+												<h3 class="text-sm font-semibold text-gray-900">Watchlist Updates</h3>
+												<a href="/watchlist" class="text-xs text-indigo-600 hover:text-indigo-800">View all</a>
+											</div>
+
+											{#if updatesLoading}
+												<div class="px-4 py-8 text-center">
+													<svg class="animate-spin h-6 w-6 text-indigo-600 mx-auto" viewBox="0 0 24 24">
+														<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+														<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+													</svg>
+												</div>
+											{:else if recentUpdates.length === 0}
+												<div class="px-4 py-6 text-center text-sm text-gray-500">
+													No updates yet
+												</div>
+											{:else}
+												<div class="max-h-80 overflow-y-auto">
+													{#each recentUpdates as update}
+														<div
+															class="px-4 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0"
+														>
+															<div class="flex items-start gap-3">
+																<!-- Thumbnail -->
+																{#if update.watchlist_item?.content}
+																	<a href="/show/{update.watchlist_item.content.tvdb_id}" class="flex-shrink-0">
+																		<img
+																			src={update.watchlist_item.content.image_url || update.watchlist_item.content.poster_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="60"%3E%3Crect fill="%23e5e7eb" width="40" height="60"/%3E%3C/svg%3E'}
+																			alt=""
+																			class="w-10 h-14 object-cover rounded"
+																		/>
+																	</a>
+																{:else if update.watchlist_item?.person}
+																	<a href="/person/{update.watchlist_item.person.tvdb_id}" class="flex-shrink-0">
+																		<img
+																			src={update.watchlist_item.person.image_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40"%3E%3Crect fill="%23e5e7eb" width="40" height="40"/%3E%3C/svg%3E'}
+																			alt=""
+																			class="w-10 h-10 object-cover rounded-full"
+																		/>
+																	</a>
+																{/if}
+
+																<div class="flex-1 min-w-0">
+																	<p class="text-sm text-gray-900 line-clamp-2">{update.description}</p>
+																	<p class="text-xs text-gray-400 mt-1">{formatRelativeTime(update.created_at)}</p>
+																</div>
+
+																{#if !update.is_read}
+																	<button
+																		on:click|stopPropagation={() => markAsRead(update.id)}
+																		class="flex-shrink-0 p-1 text-gray-400 hover:text-indigo-600"
+																		title="Mark as read"
+																	>
+																		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+																		</svg>
+																	</button>
+																{/if}
+															</div>
+														</div>
+													{/each}
+												</div>
+											{/if}
+										</div>
+									</div>
+								{/if}
+							</div>
+						{/if}
+
 						<div class="relative">
 							<button
 								on:click={() => menuOpen = !menuOpen}

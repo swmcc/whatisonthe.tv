@@ -13,6 +13,7 @@ from app.models.season import Season
 from app.models.episode import Episode
 from app.models.checkin import Checkin
 from app.models.watchlist import WatchlistItem, WatchlistItemType, PersonRoleFilter
+from app.models.watchlist_update import WatchlistUpdate, UpdateType
 
 __all__ = [
     "User",
@@ -31,4 +32,6 @@ __all__ = [
     "WatchlistItem",
     "WatchlistItemType",
     "PersonRoleFilter",
+    "WatchlistUpdate",
+    "UpdateType",
 ]

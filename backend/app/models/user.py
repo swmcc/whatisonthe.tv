@@ -11,6 +11,7 @@ from app.db.database import Base
 if TYPE_CHECKING:
     from app.models.checkin import Checkin
     from app.models.watchlist import WatchlistItem
+    from app.models.watchlist_update import WatchlistUpdate
 
 
 class User(Base):
@@ -43,6 +44,12 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
         order_by="WatchlistItem.created_at.desc()"
+    )
+    watchlist_updates: Mapped[list["WatchlistUpdate"]] = relationship(
+        "WatchlistUpdate",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="WatchlistUpdate.created_at.desc()"
     )
 
     def __repr__(self) -> str:

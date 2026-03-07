@@ -30,6 +30,7 @@ celery_app = Celery(
         "app.tasks.content",
         "app.tasks.person",
         "app.tasks.scheduled",
+        "app.tasks.watchlist_updates",
     ]
 )
 
@@ -65,6 +66,7 @@ celery_app.conf.update(
         "app.tasks.content.save_movie_full": {"queue": "content", "priority": 5},
         "app.tasks.person.save_person_full": {"queue": "person", "priority": 5},
         "app.tasks.scheduled.*": {"queue": "scheduled", "priority": 1},
+        "app.tasks.watchlist_updates.*": {"queue": "scheduled", "priority": 2},
     },
 
     # Retry settings
@@ -83,6 +85,11 @@ celery_app.conf.beat_schedule = {
     "cleanup-old-sync-logs": {
         "task": "app.tasks.scheduled.cleanup_old_sync_logs",
         "schedule": crontab(hour=4, minute=0, day_of_month=1),  # 1st of month, 4 AM
+    },
+    # Check watchlist for updates daily
+    "check-watchlist-updates": {
+        "task": "app.tasks.watchlist_updates.check_watchlist_updates",
+        "schedule": crontab(hour=6, minute=0),  # Daily at 6 AM
     },
 }
 
