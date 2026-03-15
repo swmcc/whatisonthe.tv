@@ -34,3 +34,7 @@ tvdb_v4_official==1.1.0
 celery==5.3.6
 flower==2.0.1
 anthropic
+
+# Email
+mailjunky>=0.1.0
+mailview>=0.1.0

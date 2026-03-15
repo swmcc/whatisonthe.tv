@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     llm_model: str = "claude-sonnet-4-20250514"  # or "gpt-4o-mini" for OpenAI
 
+    # Email Configuration
+    mailjunky_api_key: str = ""
+    email_from_address: str = "noreply@whatisonthe.tv"
+    email_from_name: str = "What Is On The TV"
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):

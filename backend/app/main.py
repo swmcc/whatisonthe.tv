@@ -1,6 +1,5 @@
 """Main FastAPI application."""
 
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -50,6 +49,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add mailview middleware for email preview in development
+if settings.debug:
+    try:
+        from mailview import MailviewMiddleware
+
+        app.add_middleware(MailviewMiddleware, enabled=True)
+        print("📧 Mailview enabled - view emails at /_mail")
+    except ImportError:
+        pass  # mailview not installed
+
 # Include API routers with /api prefix to avoid conflicts with frontend routes
 app.include_router(auth.router, prefix="/api")
 app.include_router(search.router, prefix="/api", tags=["search"])
@@ -76,8 +85,8 @@ if frontend_build_path.exists():
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         """Serve frontend for all non-API routes."""
-        # Don't intercept API routes
-        if full_path.startswith(("api/", "health", "docs", "redoc", "openapi.json")):
+        # Don't intercept API routes or mailview
+        if full_path.startswith(("api/", "health", "docs", "redoc", "openapi.json", "_mail")):
             return {"error": "Not found"}
 
         # Try to serve static file first
