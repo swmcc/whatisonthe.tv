@@ -31,6 +31,7 @@ celery_app = Celery(
         "app.tasks.person",
         "app.tasks.scheduled",
         "app.tasks.watchlist_updates",
+        "app.tasks.email_notifications",
     ]
 )
 
@@ -67,6 +68,7 @@ celery_app.conf.update(
         "app.tasks.person.save_person_full": {"queue": "person", "priority": 5},
         "app.tasks.scheduled.*": {"queue": "scheduled", "priority": 1},
         "app.tasks.watchlist_updates.*": {"queue": "scheduled", "priority": 2},
+        "app.tasks.email_notifications.*": {"queue": "scheduled", "priority": 3},
     },
 
     # Retry settings
@@ -90,6 +92,11 @@ celery_app.conf.beat_schedule = {
     "check-watchlist-updates": {
         "task": "app.tasks.watchlist_updates.check_watchlist_updates",
         "schedule": crontab(hour=6, minute=0),  # Daily at 6 AM
+    },
+    # Send daily watchlist digest emails
+    "send-daily-watchlist-emails": {
+        "task": "app.tasks.email_notifications.send_daily_watchlist_emails",
+        "schedule": crontab(hour=8, minute=0),  # Daily at 8 AM (after updates check)
     },
 }
 
