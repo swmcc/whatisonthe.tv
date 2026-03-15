@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.database import SyncSessionLocal
 from app.models import Content, WatchlistItem, Season, Episode, Person, Credit
+from app.models.watchlist import PersonRoleFilter
 from app.models.watchlist_update import WatchlistUpdate, UpdateType
 from app.services.tvdb import tvdb_service
 from app.workers.celery_app import celery_app
@@ -343,9 +344,10 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
             new_roles_found += 1
             print(f"      → NEW ROLE: {content_name}")
 
-            # Check role filter if set
+            # Check role filter if set - skip if filter is DIRECTOR only (watching for director roles, not actor)
             for item in watchlist_items:
-                if item.person_role_filter and item.person_role_filter != "actor":
+                if item.person_role_filter == PersonRoleFilter.DIRECTOR:
+                    print(f"        Skipping user {item.user_id}: filter is DIRECTOR only")
                     continue
 
                 description = f'{person.full_name} cast in "{content_name}"'
