@@ -14,6 +14,8 @@ from app.models.episode import Episode
 from app.models.checkin import Checkin
 from app.models.watchlist import WatchlistItem, WatchlistItemType, PersonRoleFilter
 from app.models.watchlist_update import WatchlistUpdate, UpdateType
+from app.models.watchlist_person_snapshot import WatchlistPersonSnapshot
+from app.models.watchlist_content_snapshot import WatchlistContentSnapshot
 
 __all__ = [
     "User",
@@ -34,4 +36,6 @@ __all__ = [
     "PersonRoleFilter",
     "WatchlistUpdate",
     "UpdateType",
+    "WatchlistPersonSnapshot",
+    "WatchlistContentSnapshot",
 ]

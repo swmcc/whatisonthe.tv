@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from app.models.person import Person
     from app.models.user import User
     from app.models.watchlist_update import WatchlistUpdate
+    from app.models.watchlist_person_snapshot import WatchlistPersonSnapshot
+    from app.models.watchlist_content_snapshot import WatchlistContentSnapshot
 
 
 class WatchlistItemType(str, Enum):
@@ -100,6 +102,16 @@ class WatchlistItem(Base):
         back_populates="watchlist_item",
         cascade="all, delete-orphan",
         order_by="WatchlistUpdate.created_at.desc()"
+    )
+    person_snapshot_credits: Mapped[list["WatchlistPersonSnapshot"]] = relationship(
+        "WatchlistPersonSnapshot",
+        back_populates="watchlist_item",
+        cascade="all, delete-orphan",
+    )
+    content_snapshot_cast: Mapped[list["WatchlistContentSnapshot"]] = relationship(
+        "WatchlistContentSnapshot",
+        back_populates="watchlist_item",
+        cascade="all, delete-orphan",
     )
 
     # Indexes and constraints

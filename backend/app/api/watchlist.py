@@ -11,6 +11,8 @@ from app.models.content import Content
 from app.models.person import Person
 from app.models.user import User
 from app.models.watchlist import WatchlistItem, WatchlistItemType
+from app.models.watchlist_person_snapshot import WatchlistPersonSnapshot
+from app.models.watchlist_content_snapshot import WatchlistContentSnapshot
 from app.schemas.watchlist import (
     WatchlistCheckResponse,
     WatchlistContentCreate,
@@ -149,6 +151,35 @@ async def add_content_to_watchlist(
     )
 
     db.add(item)
+    await db.flush()
+
+    # Create snapshot of current cast from TVDB (for series only)
+    # This captures all known cast members at the time of adding to watchlist
+    if content.content_type == "series":
+        from app.services.tvdb import tvdb_service
+
+        # Fetch current details to get characters/cast
+        series_data = tvdb_service.get_series_details(content.tvdb_id)
+        if series_data:
+            api_characters = series_data.get("characters", [])
+            snapshot_cast: set[tuple[int, str]] = set()
+
+            for char in api_characters:
+                person_id = char.get("peopleId") or char.get("personId")
+                if not person_id:
+                    continue
+
+                # Track actors in the cast
+                cast_key = (person_id, "actor")
+                if cast_key not in snapshot_cast:
+                    snapshot = WatchlistContentSnapshot(
+                        watchlist_item_id=item.id,
+                        person_tvdb_id=person_id,
+                        role_type="actor",
+                    )
+                    db.add(snapshot)
+                    snapshot_cast.add(cast_key)
+
     await db.commit()
     await db.refresh(item)
 
@@ -172,6 +203,10 @@ async def add_person_to_watchlist(
     """
     Add person (actor/director) to watchlist.
 
+    When a person is added to the watchlist, we also capture a snapshot of their
+    current credits from TVDB. This snapshot is used to detect new credits in
+    future watchlist update checks.
+
     Args:
         watchlist_data: Person watchlist data
         current_user: Current authenticated user
@@ -183,21 +218,23 @@ async def add_person_to_watchlist(
     Raises:
         HTTPException: If person not found or already in watchlist
     """
+    from app.services.tvdb import tvdb_service
+
     # Find person by TVDB ID
     result = await db.execute(select(Person).where(Person.tvdb_id == watchlist_data.person_id))
     person = result.scalar_one_or_none()
 
-    # If not in DB, fetch from TVDB and create basic record
-    if not person:
-        from app.services.tvdb import tvdb_service
-        from app.tasks.person import save_person_full
+    # Always fetch from TVDB to get current credits for snapshot
+    api_data = tvdb_service.get_person_details(watchlist_data.person_id)
+    if not api_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Person with TVDB ID {watchlist_data.person_id} not found on TVDB",
+        )
 
-        api_data = tvdb_service.get_person_details(watchlist_data.person_id)
-        if not api_data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Person with TVDB ID {watchlist_data.person_id} not found on TVDB",
-            )
+    # If not in DB, create basic record
+    if not person:
+        from app.tasks.person import save_person_full
 
         # Create basic person record
         person = Person(
@@ -237,6 +274,32 @@ async def add_person_to_watchlist(
     )
 
     db.add(item)
+    await db.flush()
+
+    # Create snapshot of current credits from TVDB
+    # This captures all known credits at the time of adding to watchlist
+    api_characters = api_data.get("characters", [])
+    snapshot_credits: set[tuple[int, str]] = set()
+
+    for char in api_characters:
+        series_id = char.get("seriesId")
+        movie_id = char.get("movieId")
+        content_tvdb_id = series_id or movie_id
+
+        if not content_tvdb_id:
+            continue
+
+        # Currently only actor roles are tracked in characters
+        credit_key = (content_tvdb_id, "actor")
+        if credit_key not in snapshot_credits:
+            snapshot = WatchlistPersonSnapshot(
+                watchlist_item_id=item.id,
+                content_tvdb_id=content_tvdb_id,
+                role_type="actor",
+            )
+            db.add(snapshot)
+            snapshot_credits.add(credit_key)
+
     await db.commit()
     await db.refresh(item)
 

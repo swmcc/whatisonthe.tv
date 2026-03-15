@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db.database import SyncSessionLocal
-from app.models import Content, WatchlistItem, Season, Episode, Person, Credit
+from app.models import Content, WatchlistItem, Season, Episode, Person, Credit, WatchlistPersonSnapshot, WatchlistContentSnapshot
 from app.models.watchlist import PersonRoleFilter
 from app.models.watchlist_update import WatchlistUpdate, UpdateType
 from app.services.tvdb import tvdb_service
@@ -297,22 +297,12 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
     """
     Check a person for new projects/credits.
 
+    Compares the person's current TVDB credits against each watchlist item's
+    snapshot to detect new credits since the person was added to that user's watchlist.
+
     Returns number of updates created.
     """
     updates_created = 0
-
-    # Get existing credits from database
-    stmt = select(Credit).where(Credit.person_id == person.id)
-    result = db.execute(stmt)
-    existing_credits = result.scalars().all()
-
-    # Build set of existing (content_tvdb_id, role_type) pairs
-    existing_credit_keys: set[tuple[int, str]] = set()
-    for credit in existing_credits:
-        if credit.content and credit.content.tvdb_id:
-            existing_credit_keys.add((credit.content.tvdb_id, credit.role_type))
-
-    print(f"      DB: {len(existing_credits)} credits tracked")
 
     # Fetch latest from TVDB
     api_data = tvdb_service.get_person_details(person.tvdb_id)
@@ -322,33 +312,48 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
 
     now = datetime.now(timezone.utc)
 
-    # Check characters (acting roles)
+    # Check characters (acting roles) from TVDB
     api_characters = api_data.get("characters", [])
     print(f"      TVDB: {len(api_characters)} characters/roles")
 
-    new_roles_found = 0
-    for char in api_characters:
-        series_id = char.get("seriesId")
-        movie_id = char.get("movieId")
-        content_tvdb_id = series_id or movie_id
+    # Process each watchlist item separately (different users may have added at different times)
+    for item in watchlist_items:
+        # Get existing snapshot for this watchlist item
+        stmt = select(WatchlistPersonSnapshot).where(
+            WatchlistPersonSnapshot.watchlist_item_id == item.id
+        )
+        result = db.execute(stmt)
+        snapshot_credits = result.scalars().all()
 
-        if not content_tvdb_id:
+        # Build set of known (content_tvdb_id, role_type) pairs from snapshot
+        known_credit_keys: set[tuple[int, str]] = {
+            (sc.content_tvdb_id, sc.role_type) for sc in snapshot_credits
+        }
+
+        print(f"      User {item.user_id}: {len(known_credit_keys)} credits in snapshot")
+
+        # Check role filter
+        if item.person_role_filter == PersonRoleFilter.DIRECTOR:
+            print("        Skipping: filter is DIRECTOR only")
             continue
 
-        credit_key = (content_tvdb_id, "actor")
-        if credit_key not in existing_credit_keys:
-            # New acting role found
-            content_name = char.get("seriesName") or char.get("movieName") or char.get("name") or "Unknown Project"
-            character_name = char.get("name") or char.get("personName") or ""
+        new_roles_for_user = 0
+        for char in api_characters:
+            series_id = char.get("seriesId")
+            movie_id = char.get("movieId")
+            content_tvdb_id = series_id or movie_id
 
-            new_roles_found += 1
-            print(f"      → NEW ROLE: {content_name}")
+            if not content_tvdb_id:
+                continue
 
-            # Check role filter if set - skip if filter is DIRECTOR only (watching for director roles, not actor)
-            for item in watchlist_items:
-                if item.person_role_filter == PersonRoleFilter.DIRECTOR:
-                    print(f"        Skipping user {item.user_id}: filter is DIRECTOR only")
-                    continue
+            credit_key = (content_tvdb_id, "actor")
+            if credit_key not in known_credit_keys:
+                # New acting role found for this user
+                content_name = char.get("seriesName") or char.get("movieName") or char.get("name") or "Unknown Project"
+                character_name = char.get("name") or char.get("personName") or ""
+
+                new_roles_for_user += 1
+                print(f"        → NEW ROLE: {content_name}")
 
                 description = f'{person.full_name} cast in "{content_name}"'
                 if character_name and character_name != person.full_name:
@@ -371,11 +376,19 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
                 db.add(update)
                 updates_created += 1
 
-            # Add to set so we don't duplicate
-            existing_credit_keys.add(credit_key)
+                # Add to snapshot so we don't notify again in future runs
+                new_snapshot = WatchlistPersonSnapshot(
+                    watchlist_item_id=item.id,
+                    content_tvdb_id=content_tvdb_id,
+                    role_type="actor",
+                )
+                db.add(new_snapshot)
 
-    if new_roles_found == 0:
-        print("      No new roles found")
+                # Add to set so we don't duplicate within this run
+                known_credit_keys.add(credit_key)
+
+        if new_roles_for_user == 0:
+            print("        No new roles found")
 
     return updates_created
 
@@ -383,41 +396,50 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
 def _check_content_for_new_cast(
     db, content: Content, watchlist_items: list[WatchlistItem], api_data: dict[str, Any]
 ) -> int:
-    """Check if any new cast members have been added to the content."""
+    """
+    Check if any new cast members have been added to the content.
+
+    Uses each watchlist item's snapshot to determine what's "new" - cast members
+    not in the snapshot at the time the user added this content to their watchlist.
+    """
     updates_created = 0
-
-    # Get existing cast from database
-    stmt = select(Credit).where(
-        Credit.content_id == content.id,
-        Credit.role_type == "actor"
-    )
-    result = db.execute(stmt)
-    existing_cast = result.scalars().all()
-
-    # Build set of existing person TVDB IDs
-    existing_person_ids: set[int] = set()
-    for credit in existing_cast:
-        if credit.person and credit.person.tvdb_id:
-            existing_person_ids.add(credit.person.tvdb_id)
 
     # Check characters from API
     api_characters = api_data.get("characters", [])
     now = datetime.now(timezone.utc)
 
-    for char in api_characters:
-        person_id = char.get("peopleId") or char.get("personId")
-        if not person_id or person_id in existing_person_ids:
-            continue
+    # Process each watchlist item separately (each user has their own snapshot)
+    for item in watchlist_items:
+        # Get known cast from this item's snapshot
+        stmt = select(WatchlistContentSnapshot).where(
+            WatchlistContentSnapshot.watchlist_item_id == item.id,
+            WatchlistContentSnapshot.role_type == "actor"
+        )
+        result = db.execute(stmt)
+        snapshot_entries = result.scalars().all()
 
-        # Only notify for main cast (low sort order)
-        sort_order = char.get("sort", 999)
-        if sort_order > 10:  # Only top 10 billed
-            continue
+        # Build set of known person TVDB IDs for this user
+        known_person_ids: set[int] = {entry.person_tvdb_id for entry in snapshot_entries}
 
-        person_name = char.get("personName") or "Unknown"
-        character_name = char.get("name") or ""
+        print(f"      User {item.user_id}: {len(known_person_ids)} cast in snapshot")
 
-        for item in watchlist_items:
+        new_cast_for_user = 0
+
+        for char in api_characters:
+            person_id = char.get("peopleId") or char.get("personId")
+            if not person_id or person_id in known_person_ids:
+                continue
+
+            # Only notify for main cast (low sort order)
+            sort_order = char.get("sort", 999)
+            if sort_order > 10:  # Only top 10 billed
+                continue
+
+            person_name = char.get("personName") or "Unknown"
+            character_name = char.get("name") or ""
+
+            print(f"        → NEW CAST: {person_name}")
+
             description = f'{person_name} joined the cast of "{content.name}"'
             if character_name:
                 description += f' as {character_name}'
@@ -438,8 +460,20 @@ def _check_content_for_new_cast(
             )
             db.add(update)
             updates_created += 1
+            new_cast_for_user += 1
 
-        # Add to set so we don't duplicate
-        existing_person_ids.add(person_id)
+            # Add to snapshot so we don't report again
+            new_snapshot = WatchlistContentSnapshot(
+                watchlist_item_id=item.id,
+                person_tvdb_id=person_id,
+                role_type="actor",
+            )
+            db.add(new_snapshot)
+
+            # Add to set so we don't duplicate within this run
+            known_person_ids.add(person_id)
+
+        if new_cast_for_user == 0:
+            print("        No new cast found")
 
     return updates_created
