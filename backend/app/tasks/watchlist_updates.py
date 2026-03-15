@@ -27,6 +27,11 @@ def check_watchlist_updates(self):
 
     This task should run daily via Celery beat.
     """
+    print("=" * 60)
+    print("WATCHLIST UPDATE CHECK STARTED")
+    print(f"Time: {datetime.now(timezone.utc).isoformat()}")
+    print("=" * 60)
+
     with SyncSessionLocal() as db:
         updates_created = 0
 
@@ -46,16 +51,22 @@ def check_watchlist_updates(self):
                 content_to_users[item.content_id] = []
             content_to_users[item.content_id].append(item)
 
+        print(f"\n[CONTENT] Checking {len(content_to_users)} shows on watchlists...")
+
         for content_id, items in content_to_users.items():
             content = items[0].content
             if not content or content.content_type != "series":
                 continue
 
+            print(f"  - Checking: {content.name} (TVDB: {content.tvdb_id})")
+
             try:
                 updates = _check_content_for_updates(db, content, items)
+                if updates > 0:
+                    print(f"    → Found {updates} update(s)!")
                 updates_created += updates
             except Exception as e:
-                print(f"Error checking content {content_id}: {e}")
+                print(f"    → ERROR: {e}")
                 continue
 
         # --- Check people on watchlists ---
@@ -74,19 +85,31 @@ def check_watchlist_updates(self):
                 person_to_users[item.person_id] = []
             person_to_users[item.person_id].append(item)
 
+        print(f"\n[PEOPLE] Checking {len(person_to_users)} people on watchlists...")
+
         for person_id, items in person_to_users.items():
             person = items[0].person
             if not person:
                 continue
 
+            print(f"  - Checking: {person.full_name} (TVDB: {person.tvdb_id})")
+
             try:
                 updates = _check_person_for_updates(db, person, items)
+                if updates > 0:
+                    print(f"    → Found {updates} update(s)!")
                 updates_created += updates
             except Exception as e:
-                print(f"Error checking person {person_id}: {e}")
+                print(f"    → ERROR: {e}")
                 continue
 
         db.commit()
+
+        print("\n" + "=" * 60)
+        print("WATCHLIST UPDATE CHECK COMPLETE")
+        print(f"Total updates created: {updates_created}")
+        print("=" * 60)
+
         return {"status": "success", "updates_created": updates_created}
 
 
@@ -108,9 +131,12 @@ def _check_content_for_updates(db, content: Content, watchlist_items: list[Watch
     result = db.execute(stmt)
     existing_episodes = {(e.season_number, e.episode_number): e for e in result.scalars().all()}
 
+    print(f"      DB: {len(existing_seasons)} seasons, {len(existing_episodes)} episodes, status='{content.status}'")
+
     # Fetch latest from TVDB
     api_data = tvdb_service.get_series_details(content.tvdb_id)
     if not api_data:
+        print("      TVDB: No data returned!")
         return 0
 
     # Check for status changes
@@ -118,7 +144,10 @@ def _check_content_for_updates(db, content: Content, watchlist_items: list[Watch
     if isinstance(new_status, dict):
         new_status = new_status.get("name")
 
+    print(f"      TVDB: status='{new_status}'")
+
     if new_status and content.status and new_status != content.status:
+        print(f"      → STATUS CHANGE: '{content.status}' → '{new_status}'")
         updates_created += _create_status_update(
             db, content, watchlist_items, content.status, new_status
         )
@@ -282,15 +311,21 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
         if credit.content and credit.content.tvdb_id:
             existing_credit_keys.add((credit.content.tvdb_id, credit.role_type))
 
+    print(f"      DB: {len(existing_credits)} credits tracked")
+
     # Fetch latest from TVDB
     api_data = tvdb_service.get_person_details(person.tvdb_id)
     if not api_data:
+        print("      TVDB: No data returned!")
         return 0
 
     now = datetime.now(timezone.utc)
 
     # Check characters (acting roles)
     api_characters = api_data.get("characters", [])
+    print(f"      TVDB: {len(api_characters)} characters/roles")
+
+    new_roles_found = 0
     for char in api_characters:
         series_id = char.get("seriesId")
         movie_id = char.get("movieId")
@@ -304,6 +339,9 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
             # New acting role found
             content_name = char.get("seriesName") or char.get("movieName") or char.get("name") or "Unknown Project"
             character_name = char.get("name") or char.get("personName") or ""
+
+            new_roles_found += 1
+            print(f"      → NEW ROLE: {content_name}")
 
             # Check role filter if set
             for item in watchlist_items:
@@ -333,6 +371,9 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
 
             # Add to set so we don't duplicate
             existing_credit_keys.add(credit_key)
+
+    if new_roles_found == 0:
+        print("      No new roles found")
 
     return updates_created
 
