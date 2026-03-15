@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db.database import SyncSessionLocal
-from app.models import Content, WatchlistItem, Season, Episode
+from app.models import Content, WatchlistItem, Season, Episode, Person, Credit
 from app.models.watchlist_update import WatchlistUpdate, UpdateType
 from app.services.tvdb import tvdb_service
 from app.workers.celery_app import celery_app
@@ -16,33 +16,35 @@ from app.workers.celery_app import celery_app
 @celery_app.task(bind=True, max_retries=3)
 def check_watchlist_updates(self):
     """
-    Check for updates to content on users' watchlists.
+    Check for updates to content and people on users' watchlists.
 
     Detects:
     - New seasons added to shows
     - Episodes that now have air dates (were TBD)
     - Status changes (renewed, cancelled, ended)
+    - New cast members on shows
+    - New projects for people on watchlist
 
     This task should run daily via Celery beat.
     """
     with SyncSessionLocal() as db:
-        # Get all unique content IDs from all watchlists
+        updates_created = 0
+
+        # --- Check content (shows) on watchlists ---
         stmt = (
             select(WatchlistItem)
             .where(WatchlistItem.content_id.isnot(None))
             .options(selectinload(WatchlistItem.content))
         )
         result = db.execute(stmt)
-        watchlist_items = result.scalars().all()
+        content_watchlist_items = result.scalars().all()
 
         # Group by content to avoid duplicate API calls
         content_to_users: dict[int, list[WatchlistItem]] = {}
-        for item in watchlist_items:
+        for item in content_watchlist_items:
             if item.content_id not in content_to_users:
                 content_to_users[item.content_id] = []
             content_to_users[item.content_id].append(item)
-
-        updates_created = 0
 
         for content_id, items in content_to_users.items():
             content = items[0].content
@@ -54,6 +56,34 @@ def check_watchlist_updates(self):
                 updates_created += updates
             except Exception as e:
                 print(f"Error checking content {content_id}: {e}")
+                continue
+
+        # --- Check people on watchlists ---
+        stmt = (
+            select(WatchlistItem)
+            .where(WatchlistItem.person_id.isnot(None))
+            .options(selectinload(WatchlistItem.person))
+        )
+        result = db.execute(stmt)
+        person_watchlist_items = result.scalars().all()
+
+        # Group by person to avoid duplicate API calls
+        person_to_users: dict[int, list[WatchlistItem]] = {}
+        for item in person_watchlist_items:
+            if item.person_id not in person_to_users:
+                person_to_users[item.person_id] = []
+            person_to_users[item.person_id].append(item)
+
+        for person_id, items in person_to_users.items():
+            person = items[0].person
+            if not person:
+                continue
+
+            try:
+                updates = _check_person_for_updates(db, person, items)
+                updates_created += updates
+            except Exception as e:
+                print(f"Error checking person {person_id}: {e}")
                 continue
 
         db.commit()
@@ -130,6 +160,9 @@ def _check_content_for_updates(db, content: Content, watchlist_items: list[Watch
                 updates_created += _create_episode_dated_update(
                     db, content, watchlist_items, existing_ep, aired_str
                 )
+
+    # Check for new cast members
+    updates_created += _check_content_for_new_cast(db, content, watchlist_items, api_data)
 
     return updates_created
 
@@ -228,3 +261,142 @@ def _create_episode_dated_update(
         count += 1
 
     return count
+
+
+def _check_person_for_updates(db, person: Person, watchlist_items: list[WatchlistItem]) -> int:
+    """
+    Check a person for new projects/credits.
+
+    Returns number of updates created.
+    """
+    updates_created = 0
+
+    # Get existing credits from database
+    stmt = select(Credit).where(Credit.person_id == person.id)
+    result = db.execute(stmt)
+    existing_credits = result.scalars().all()
+
+    # Build set of existing (content_tvdb_id, role_type) pairs
+    existing_credit_keys: set[tuple[int, str]] = set()
+    for credit in existing_credits:
+        if credit.content and credit.content.tvdb_id:
+            existing_credit_keys.add((credit.content.tvdb_id, credit.role_type))
+
+    # Fetch latest from TVDB
+    api_data = tvdb_service.get_person_details(person.tvdb_id)
+    if not api_data:
+        return 0
+
+    now = datetime.now(timezone.utc)
+
+    # Check characters (acting roles)
+    api_characters = api_data.get("characters", [])
+    for char in api_characters:
+        series_id = char.get("seriesId")
+        movie_id = char.get("movieId")
+        content_tvdb_id = series_id or movie_id
+
+        if not content_tvdb_id:
+            continue
+
+        credit_key = (content_tvdb_id, "actor")
+        if credit_key not in existing_credit_keys:
+            # New acting role found
+            content_name = char.get("seriesName") or char.get("movieName") or char.get("name") or "Unknown Project"
+            character_name = char.get("name") or char.get("personName") or ""
+
+            # Check role filter if set
+            for item in watchlist_items:
+                if item.person_role_filter and item.person_role_filter != "actor":
+                    continue
+
+                description = f'{person.full_name} cast in "{content_name}"'
+                if character_name and character_name != person.full_name:
+                    description += f' as {character_name}'
+
+                update = WatchlistUpdate(
+                    user_id=item.user_id,
+                    watchlist_item_id=item.id,
+                    update_type=UpdateType.NEW_CAST,
+                    description=description,
+                    details={
+                        "content_tvdb_id": content_tvdb_id,
+                        "content_name": content_name,
+                        "role_type": "actor",
+                        "character_name": character_name,
+                    },
+                    is_read=False,
+                    created_at=now,
+                )
+                db.add(update)
+                updates_created += 1
+
+            # Add to set so we don't duplicate
+            existing_credit_keys.add(credit_key)
+
+    return updates_created
+
+
+def _check_content_for_new_cast(
+    db, content: Content, watchlist_items: list[WatchlistItem], api_data: dict[str, Any]
+) -> int:
+    """Check if any new cast members have been added to the content."""
+    updates_created = 0
+
+    # Get existing cast from database
+    stmt = select(Credit).where(
+        Credit.content_id == content.id,
+        Credit.role_type == "actor"
+    )
+    result = db.execute(stmt)
+    existing_cast = result.scalars().all()
+
+    # Build set of existing person TVDB IDs
+    existing_person_ids: set[int] = set()
+    for credit in existing_cast:
+        if credit.person and credit.person.tvdb_id:
+            existing_person_ids.add(credit.person.tvdb_id)
+
+    # Check characters from API
+    api_characters = api_data.get("characters", [])
+    now = datetime.now(timezone.utc)
+
+    for char in api_characters:
+        person_id = char.get("peopleId") or char.get("personId")
+        if not person_id or person_id in existing_person_ids:
+            continue
+
+        # Only notify for main cast (low sort order)
+        sort_order = char.get("sort", 999)
+        if sort_order > 10:  # Only top 10 billed
+            continue
+
+        person_name = char.get("personName") or "Unknown"
+        character_name = char.get("name") or ""
+
+        for item in watchlist_items:
+            description = f'{person_name} joined the cast of "{content.name}"'
+            if character_name:
+                description += f' as {character_name}'
+
+            update = WatchlistUpdate(
+                user_id=item.user_id,
+                watchlist_item_id=item.id,
+                update_type=UpdateType.NEW_CAST,
+                description=description,
+                details={
+                    "person_tvdb_id": person_id,
+                    "person_name": person_name,
+                    "character_name": character_name,
+                    "sort_order": sort_order,
+                },
+                is_read=False,
+                created_at=now,
+            )
+            db.add(update)
+            updates_created += 1
+
+        # Add to set so we don't duplicate
+        existing_person_ids.add(person_id)
+
+    return updates_created
