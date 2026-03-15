@@ -45,8 +45,11 @@ class TestEmailService:
         # Should be same instance
         assert client1 is client2
 
-    def test_send_calls_client_with_correct_params(self):
-        """Test that send method calls client with correct parameters."""
+    @patch("app.services.email.settings")
+    def test_send_calls_client_with_correct_params(self, mock_settings):
+        """Test that send method calls client with correct parameters in production."""
+        mock_settings.debug = False  # Production mode
+
         mock_client = MagicMock()
         mock_client.emails.send.return_value = {"id": "msg-123"}
         self.service._client = mock_client
@@ -73,8 +76,11 @@ class TestEmailService:
         )
         assert result == {"id": "msg-123"}
 
-    def test_send_with_minimal_params(self):
-        """Test send with only required parameters."""
+    @patch("app.services.email.settings")
+    def test_send_with_minimal_params(self, mock_settings):
+        """Test send with only required parameters in production."""
+        mock_settings.debug = False  # Production mode
+
         mock_client = MagicMock()
         mock_client.emails.send.return_value = {"id": "msg-456"}
         self.service._client = mock_client
@@ -96,8 +102,35 @@ class TestEmailService:
             metadata=None,
         )
 
-    def test_send_batch_calls_client_correctly(self):
-        """Test batch email sending."""
+    @patch("app.services.email._capture_to_mailview")
+    @patch("app.services.email.settings")
+    def test_send_captures_to_mailview_in_debug(self, mock_settings, mock_capture):
+        """Test that send captures to mailview in debug mode."""
+        mock_settings.debug = True
+        mock_capture.return_value = "email-123"
+
+        result = self.service.send(
+            to="recipient@example.com",
+            subject="Test Subject",
+            html_body="<h1>Hello</h1>",
+            text_body="Hello",
+        )
+
+        mock_capture.assert_called_once_with(
+            from_addr=self.service.formatted_from,
+            to="recipient@example.com",
+            subject="Test Subject",
+            html="<h1>Hello</h1>",
+            text="Hello",
+        )
+        assert result["captured"] is True
+        assert result["mailview"] is True
+
+    @patch("app.services.email.settings")
+    def test_send_batch_calls_client_correctly(self, mock_settings):
+        """Test batch email sending in production."""
+        mock_settings.debug = False  # Production mode
+
         mock_client = MagicMock()
         mock_client.emails.send_batch.return_value = {"sent": 2}
         self.service._client = mock_client
@@ -127,8 +160,11 @@ class TestEmailService:
         assert call_args[1]["tags"] == ["batch"]
         assert result == {"sent": 2}
 
-    def test_track_event_calls_client(self):
-        """Test event tracking."""
+    @patch("app.services.email.settings")
+    def test_track_event_calls_client(self, mock_settings):
+        """Test event tracking in production."""
+        mock_settings.debug = False  # Production mode
+
         mock_client = MagicMock()
         mock_client.events.track.return_value = {"tracked": True}
         self.service._client = mock_client
@@ -148,8 +184,11 @@ class TestEmailService:
         )
         assert result == {"tracked": True}
 
-    def test_track_event_with_minimal_params(self):
-        """Test event tracking with minimal parameters."""
+    @patch("app.services.email.settings")
+    def test_track_event_with_minimal_params(self, mock_settings):
+        """Test event tracking with minimal parameters in production."""
+        mock_settings.debug = False  # Production mode
+
         mock_client = MagicMock()
         mock_client.events.track.return_value = {"tracked": True}
         self.service._client = mock_client
@@ -166,8 +205,24 @@ class TestEmailService:
             session_id=None,
         )
 
-    def test_upsert_contact_calls_client(self):
-        """Test contact upsert."""
+    @patch("app.services.email.settings")
+    def test_track_event_skipped_in_debug(self, mock_settings):
+        """Test that event tracking is skipped in debug mode."""
+        mock_settings.debug = True
+
+        result = self.service.track_event(
+            event_name="login",
+            user_email="user@example.com",
+        )
+
+        assert result["skipped"] is True
+        assert result["debug"] is True
+
+    @patch("app.services.email.settings")
+    def test_upsert_contact_calls_client(self, mock_settings):
+        """Test contact upsert in production."""
+        mock_settings.debug = False  # Production mode
+
         mock_client = MagicMock()
         mock_client.contacts.upsert.return_value = {"id": "contact-123"}
         self.service._client = mock_client
@@ -189,8 +244,11 @@ class TestEmailService:
         )
         assert result == {"id": "contact-123"}
 
-    def test_upsert_contact_with_minimal_params(self):
-        """Test contact upsert with minimal parameters."""
+    @patch("app.services.email.settings")
+    def test_upsert_contact_with_minimal_params(self, mock_settings):
+        """Test contact upsert with minimal parameters in production."""
+        mock_settings.debug = False  # Production mode
+
         mock_client = MagicMock()
         mock_client.contacts.upsert.return_value = {"id": "contact-456"}
         self.service._client = mock_client
@@ -205,6 +263,16 @@ class TestEmailService:
             properties=None,
         )
 
+    @patch("app.services.email.settings")
+    def test_upsert_contact_skipped_in_debug(self, mock_settings):
+        """Test that contact upsert is skipped in debug mode."""
+        mock_settings.debug = True
+
+        result = self.service.upsert_contact(email="user@example.com")
+
+        assert result["skipped"] is True
+        assert result["debug"] is True
+
 
 class TestEmailServiceFactory:
     """Tests for email service factory functions."""
@@ -216,8 +284,9 @@ class TestEmailServiceFactory:
         email_module._email_service = None
 
     @patch("app.services.email.settings")
-    def test_get_email_service_creates_instance(self, mock_settings):
-        """Test that get_email_service creates an instance with settings."""
+    def test_get_email_service_creates_instance_in_production(self, mock_settings):
+        """Test that get_email_service creates an instance with settings in production."""
+        mock_settings.debug = False
         mock_settings.mailjunky_api_key = "real-api-key"
         mock_settings.email_from_address = "app@example.com"
         mock_settings.email_from_name = "My App"
@@ -230,9 +299,24 @@ class TestEmailServiceFactory:
         assert service.from_name == "My App"
 
     @patch("app.services.email.settings")
+    def test_get_email_service_creates_instance_in_debug(self, mock_settings):
+        """Test that get_email_service creates an instance without API key in debug."""
+        mock_settings.debug = True
+        mock_settings.mailjunky_api_key = ""  # No API key
+        mock_settings.email_from_address = "app@example.com"
+        mock_settings.email_from_name = "My App"
+
+        service = get_email_service()
+
+        assert isinstance(service, EmailService)
+        assert service.api_key == ""  # Empty in debug mode
+        assert service.from_address == "app@example.com"
+
+    @patch("app.services.email.settings")
     def test_get_email_service_returns_singleton(self, mock_settings):
         """Test that get_email_service returns same instance."""
-        mock_settings.mailjunky_api_key = "api-key"
+        mock_settings.debug = True
+        mock_settings.mailjunky_api_key = ""
         mock_settings.email_from_address = "test@test.com"
         mock_settings.email_from_name = "Test"
 
@@ -242,8 +326,9 @@ class TestEmailServiceFactory:
         assert service1 is service2
 
     @patch("app.services.email.settings")
-    def test_get_email_service_raises_when_not_configured(self, mock_settings):
-        """Test that get_email_service raises ValueError when not configured."""
+    def test_get_email_service_raises_when_not_configured_in_production(self, mock_settings):
+        """Test that get_email_service raises ValueError in production without API key."""
+        mock_settings.debug = False
         mock_settings.mailjunky_api_key = ""
 
         with pytest.raises(ValueError, match="MAILJUNKY_API_KEY is not configured"):
