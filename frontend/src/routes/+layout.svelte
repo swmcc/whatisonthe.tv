@@ -8,8 +8,10 @@
 	import { updates } from '$lib/stores/updates';
 
 	let menuOpen = false;
+	let sidebarOpen = false;
 	let updatesOpen = false;
 	let updatesLoading = false;
+	let headerSearchQuery = '';
 
 	// Subscribe to store
 	$: recentUpdates = $updates;
@@ -109,6 +111,7 @@
 	$: if ($page.url.pathname) {
 		menuOpen = false;
 		updatesOpen = false;
+		sidebarOpen = false;
 	}
 
 	async function handleLogout() {
@@ -120,6 +123,16 @@
 		auth.logout();
 		goto('/login');
 	}
+
+	function handleHeaderSearch(event: Event) {
+		event.preventDefault();
+		if (!headerSearchQuery.trim()) return;
+		goto(`/?q=${encodeURIComponent(headerSearchQuery)}`);
+		headerSearchQuery = '';
+	}
+
+	// Detect if on front page
+	$: isHomePage = $page.url.pathname === '/';
 </script>
 
 {#if $page.url.pathname === '/login'}
@@ -129,292 +142,237 @@
 	<slot />
 {:else if $auth.user}
 	<div class="min-h-screen bg-gray-50">
-		<!-- Navigation -->
-		<nav class="bg-white shadow-sm">
-			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-				<div class="flex justify-between h-16">
-					<div class="flex">
-						<div class="flex-shrink-0 flex items-center">
-							<a href="/" class="flex items-center">
-								<img src="https://swm.cc/projects/whatisonthe-tv.svg" alt="What Is On The TV" width="40" height="40" />
-							</a>
-						</div>
-						<div class="hidden sm:ml-8 sm:flex sm:space-x-8">
-							<a
-								href="/"
-								class="border-transparent text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium hover:border-indigo-500 transition-colors"
-								class:border-indigo-500={$page.url.pathname === '/'}
-								class:text-indigo-600={$page.url.pathname === '/'}
-							>
-								Search
-							</a>
-							<a
-								href="/checkins"
-								class="border-transparent text-gray-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium hover:border-indigo-500 transition-colors"
-								class:border-indigo-500={$page.url.pathname === '/checkins'}
-								class:text-indigo-600={$page.url.pathname === '/checkins'}
-							>
-								Check-ins
-							</a>
-							<a
-								href="/watchlist"
-								class="border-transparent text-gray-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium hover:border-indigo-500 transition-colors"
-								class:border-indigo-500={$page.url.pathname === '/watchlist'}
-								class:text-indigo-600={$page.url.pathname === '/watchlist'}
-							>
-								Watchlist
-							</a>
-						</div>
-					</div>
+		<!-- Sidebar overlay -->
+		{#if sidebarOpen}
+			<div
+				class="fixed inset-0 bg-gray-600 bg-opacity-50 z-30"
+				on:click={() => sidebarOpen = false}
+				on:keydown={(e) => e.key === 'Escape' && (sidebarOpen = false)}
+				role="button"
+				tabindex="0"
+				aria-label="Close sidebar"
+			></div>
+		{/if}
 
-					<div class="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
-						<!-- Updates notification bell -->
-						{#if unreadUpdatesCount > 0}
-							<div class="relative">
-								<button
-									on:click={toggleUpdates}
-									class="relative p-1 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-full"
-									title="Watchlist updates"
-								>
-									<span class="sr-only">View watchlist updates</span>
-									<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-									</svg>
-									<span class="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs font-medium">
-										{unreadUpdatesCount > 9 ? '9+' : unreadUpdatesCount}
-									</span>
-								</button>
+		<!-- Collapsible Sidebar -->
+		<aside
+			class="fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out"
+			class:-translate-x-full={!sidebarOpen}
+			class:translate-x-0={sidebarOpen}
+		>
+			<div class="flex flex-col h-full">
+				<!-- Sidebar header with logo -->
+				<div class="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+					<a href="/" class="flex items-center gap-3">
+						<img src="https://swm.cc/projects/whatisonthe-tv.svg" alt="What Is On The TV" width="36" height="36" />
+						<span class="font-semibold text-gray-900 text-sm">What Is On The TV</span>
+					</a>
+					<button
+						on:click={() => sidebarOpen = false}
+						class="p-1 text-gray-400 hover:text-gray-600"
+					>
+						<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+				</div>
 
-								{#if updatesOpen}
-									<div class="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20">
-										<div class="py-2">
-											<div class="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-												<h3 class="text-sm font-semibold text-gray-900">Watchlist Updates</h3>
-												<a href="/watchlist" class="text-xs text-indigo-600 hover:text-indigo-800">View all</a>
-											</div>
+				<!-- Navigation links -->
+				<nav class="flex-1 px-4 py-6 space-y-2">
+					<a
+						href="/"
+						class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+						class:bg-indigo-50={isHomePage}
+						class:text-indigo-700={isHomePage}
+						class:text-gray-700={!isHomePage}
+						class:hover:bg-gray-100={!isHomePage}
+						on:click={() => sidebarOpen = false}
+					>
+						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+						</svg>
+						Home
+					</a>
+					<a
+						href="/checkins"
+						class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+						class:bg-indigo-50={$page.url.pathname === '/checkins'}
+						class:text-indigo-700={$page.url.pathname === '/checkins'}
+						class:text-gray-700={$page.url.pathname !== '/checkins'}
+						class:hover:bg-gray-100={$page.url.pathname !== '/checkins'}
+						on:click={() => sidebarOpen = false}
+					>
+						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+						</svg>
+						Check-ins
+					</a>
+					<a
+						href="/watchlist"
+						class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+						class:bg-indigo-50={$page.url.pathname === '/watchlist'}
+						class:text-indigo-700={$page.url.pathname === '/watchlist'}
+						class:text-gray-700={$page.url.pathname !== '/watchlist'}
+						class:hover:bg-gray-100={$page.url.pathname !== '/watchlist'}
+						on:click={() => sidebarOpen = false}
+					>
+						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+						</svg>
+						Watchlist
+					</a>
 
-											{#if updatesLoading}
-												<div class="px-4 py-8 text-center">
-													<svg class="animate-spin h-6 w-6 text-indigo-600 mx-auto" viewBox="0 0 24 24">
-														<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-														<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-													</svg>
-												</div>
-											{:else if recentUpdates.length === 0}
-												<div class="px-4 py-6 text-center text-sm text-gray-500">
-													No updates yet
-												</div>
-											{:else}
-												<div class="max-h-80 overflow-y-auto">
-													{#each recentUpdates as update}
-														<div
-															class="px-4 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0"
-														>
-															<div class="flex items-start gap-3">
-																<!-- Thumbnail -->
-																{#if update.watchlist_item?.content}
-																	<a href="/show/{update.watchlist_item.content.tvdb_id}" class="flex-shrink-0">
-																		<img
-																			src={update.watchlist_item.content.image_url || update.watchlist_item.content.poster_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="60"%3E%3Crect fill="%23e5e7eb" width="40" height="60"/%3E%3C/svg%3E'}
-																			alt=""
-																			class="w-10 h-14 object-cover rounded"
-																		/>
-																	</a>
-																{:else if update.watchlist_item?.person}
-																	<a href="/person/{update.watchlist_item.person.tvdb_id}" class="flex-shrink-0">
-																		<img
-																			src={update.watchlist_item.person.image_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40"%3E%3Crect fill="%23e5e7eb" width="40" height="40"/%3E%3C/svg%3E'}
-																			alt=""
-																			class="w-10 h-10 object-cover rounded-full"
-																		/>
-																	</a>
-																{/if}
-
-																<div class="flex-1 min-w-0">
-																	<p class="text-sm text-gray-900 line-clamp-2">{update.description}</p>
-																	<p class="text-xs text-gray-400 mt-1">{formatRelativeTime(update.created_at)}</p>
-																</div>
-
-																{#if !update.is_read}
-																	<button
-																		on:click|stopPropagation={() => markAsRead(update.id)}
-																		class="flex-shrink-0 p-1 text-gray-400 hover:text-indigo-600"
-																		title="Mark as read"
-																	>
-																		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-																		</svg>
-																	</button>
-																{/if}
-															</div>
-														</div>
-													{/each}
-												</div>
-											{/if}
-										</div>
-									</div>
-								{/if}
-							</div>
-						{/if}
-
-						<div class="relative">
-							<button
-								on:click={() => menuOpen = !menuOpen}
-								class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 p-1"
-							>
-								<span class="sr-only">Open user menu</span>
-								<div class="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-medium">
-									{$auth.user.first_name[0]}{$auth.user.last_name[0]}
-								</div>
-								<svg class="ml-2 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-									<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+					<!-- Updates/Notifications (only shown when there are updates) -->
+					{#if unreadUpdatesCount > 0}
+						<button
+							on:click={toggleUpdates}
+							class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-700 hover:bg-gray-100"
+						>
+							<div class="flex items-center gap-3">
+								<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
 								</svg>
-							</button>
+								Updates
+							</div>
+							<span class="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-medium">
+								{unreadUpdatesCount > 99 ? '99+' : unreadUpdatesCount}
+							</span>
+						</button>
 
-							{#if menuOpen}
-								<div class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-									<div class="py-1">
-										<div class="px-4 py-3 border-b border-gray-100">
-											<p class="text-sm font-medium text-gray-900">
-												{$auth.user.first_name} {$auth.user.last_name}
-											</p>
-											{#if $auth.user.username}
-												<p class="text-xs text-indigo-600 font-medium">
-													@{$auth.user.username}
-												</p>
-											{/if}
-											<p class="text-xs text-gray-500 truncate">
-												{$auth.user.email}
-											</p>
+						<!-- Updates dropdown panel -->
+						{#if updatesOpen}
+						<div class="mt-2 mx-2 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+							<div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between bg-white">
+								<span class="text-xs font-semibold text-gray-700">Recent Updates</span>
+								<a href="/watchlist" class="text-xs text-indigo-600 hover:text-indigo-800" on:click={() => sidebarOpen = false}>View all</a>
+							</div>
+							{#if updatesLoading}
+								<div class="px-3 py-6 text-center">
+									<svg class="animate-spin h-5 w-5 text-indigo-600 mx-auto" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+								</div>
+							{:else if recentUpdates.length === 0}
+								<div class="px-3 py-4 text-center text-xs text-gray-500">
+									No updates yet
+								</div>
+							{:else}
+								<div class="max-h-48 overflow-y-auto">
+									{#each recentUpdates.slice(0, 5) as update}
+										<div class="px-3 py-2 hover:bg-white border-b border-gray-100 last:border-0">
+											<p class="text-xs text-gray-700 line-clamp-2">{update.description}</p>
+											<p class="text-xs text-gray-400 mt-0.5">{formatRelativeTime(update.created_at)}</p>
 										</div>
-										<a
-											href="/settings"
-											class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-											on:click={() => menuOpen = false}
-										>
-											<span>⚙️</span>
-											<span>Settings</span>
-										</a>
-										<button
-											on:click={handleLogout}
-											class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-										>
-											<span>👋</span>
-											<span>Sign Out</span>
-										</button>
-									</div>
+									{/each}
 								</div>
 							{/if}
 						</div>
-					</div>
+						{/if}
+					{/if}
+				</nav>
 
-					<!-- Mobile menu button -->
-					<div class="flex items-center sm:hidden">
-						<button
-							on:click={() => menuOpen = !menuOpen}
-							class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+				<!-- User section at bottom -->
+				<div class="border-t border-gray-200 p-4">
+					<div class="flex items-center gap-3">
+						<div class="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-medium flex-shrink-0">
+							{$auth.user.first_name[0]}{$auth.user.last_name[0]}
+						</div>
+						<div class="min-w-0">
+							<p class="text-sm font-medium text-gray-900 truncate">
+								{$auth.user.first_name} {$auth.user.last_name}
+							</p>
+							{#if $auth.user.username}
+								<p class="text-xs text-indigo-600 truncate">@{$auth.user.username}</p>
+							{/if}
+						</div>
+					</div>
+					<div class="mt-4 space-y-1">
+						<a
+							href="/settings"
+							class="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+							on:click={() => sidebarOpen = false}
 						>
-							<span class="sr-only">Open main menu</span>
-							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								{#if !menuOpen}
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-								{:else}
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-								{/if}
+							<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
 							</svg>
+							Settings
+						</a>
+						<button
+							on:click={handleLogout}
+							class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+						>
+							<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+							</svg>
+							Sign Out
 						</button>
 					</div>
 				</div>
 			</div>
+		</aside>
 
-			<!-- Mobile menu -->
-			{#if menuOpen}
-				<div class="sm:hidden">
-					<div class="pt-2 pb-3 space-y-1">
-						<a
-							href="/"
-							class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-							class:border-indigo-500={$page.url.pathname === '/'}
-							class:bg-indigo-50={$page.url.pathname === '/'}
-							class:text-indigo-700={$page.url.pathname === '/'}
-							class:border-transparent={$page.url.pathname !== '/'}
-							class:text-gray-600={$page.url.pathname !== '/'}
-						>
-							Search
-						</a>
-						<a
-							href="/checkins"
-							class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-							class:border-indigo-500={$page.url.pathname === '/checkins'}
-							class:bg-indigo-50={$page.url.pathname === '/checkins'}
-							class:text-indigo-700={$page.url.pathname === '/checkins'}
-							class:border-transparent={$page.url.pathname !== '/checkins'}
-							class:text-gray-600={$page.url.pathname !== '/checkins'}
-						>
-							Check-ins
-						</a>
-						<a
-							href="/watchlist"
-							class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-							class:border-indigo-500={$page.url.pathname === '/watchlist'}
-							class:bg-indigo-50={$page.url.pathname === '/watchlist'}
-							class:text-indigo-700={$page.url.pathname === '/watchlist'}
-							class:border-transparent={$page.url.pathname !== '/watchlist'}
-							class:text-gray-600={$page.url.pathname !== '/watchlist'}
-						>
-							Watchlist
-						</a>
-					</div>
-					<div class="pt-4 pb-3 border-t border-gray-200">
-						<div class="flex items-center px-4">
-							<div class="flex-shrink-0">
-								<div class="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-medium">
-									{$auth.user.first_name[0]}{$auth.user.last_name[0]}
-								</div>
-							</div>
-							<div class="ml-3">
-								<div class="text-base font-medium text-gray-800">
-									{$auth.user.first_name} {$auth.user.last_name}
-								</div>
-								{#if $auth.user.username}
-									<div class="text-xs font-medium text-indigo-600">
-										@{$auth.user.username}
-									</div>
-								{/if}
-								<div class="text-sm font-medium text-gray-500">
-									{$auth.user.email}
-								</div>
-							</div>
-						</div>
-						<div class="mt-3 space-y-1">
-							<a
-								href="/settings"
-								class="flex items-center gap-2 px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-								on:click={() => menuOpen = false}
-							>
-								<span>⚙️</span>
-								<span>Settings</span>
-							</a>
+		<!-- Main content area with top bar -->
+		<div>
+			<!-- Top navigation bar -->
+			<nav class="bg-white shadow-sm sticky top-0 z-20">
+				<div class="px-3 sm:px-6 lg:px-8">
+					<div class="flex items-center justify-between h-16 gap-3">
+						<!-- Left: Hamburger + Logo -->
+						<div class="flex items-center gap-2 flex-shrink-0">
 							<button
-								on:click={handleLogout}
-								class="flex items-center gap-2 w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+								on:click={() => sidebarOpen = !sidebarOpen}
+								class="relative p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
 							>
-								<span>👋</span>
-								<span>Sign Out</span>
+								<span class="sr-only">Toggle sidebar</span>
+								<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+								</svg>
+								<!-- Pulsing notification indicator when sidebar closed and has unread updates -->
+								{#if !sidebarOpen && unreadUpdatesCount > 0}
+									<span class="absolute top-1 right-1 flex h-3 w-3">
+										<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+										<span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+									</span>
+								{/if}
 							</button>
+
+							<a href="/" class="flex items-center">
+								<img src="https://swm.cc/projects/whatisonthe-tv.svg" alt="What Is On The TV" width="32" height="32" />
+							</a>
 						</div>
+
+						<!-- Center: Search bar (only shown when NOT on home page) -->
+						{#if !isHomePage}
+							<form on:submit={handleHeaderSearch} class="flex-1 max-w-2xl mx-auto">
+								<div class="relative w-full">
+									<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+										<svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+										</svg>
+									</div>
+									<input
+										type="text"
+										bind:value={headerSearchQuery}
+										placeholder="Search..."
+										class="w-full pl-11 pr-4 py-2.5 text-base rounded-full border border-gray-300 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow"
+									/>
+								</div>
+							</form>
+						{/if}
+
 					</div>
 				</div>
-			{/if}
-		</nav>
+			</nav>
 
-		<!-- Main content -->
-		<main>
-			<slot />
-		</main>
+			<!-- Main content -->
+			<main>
+				<slot />
+			</main>
 
-		<!-- Footer -->
-		<footer class="mt-24 border-t border-gray-200">
+			<!-- Footer -->
+			<footer class="mt-24 border-t border-gray-200">
 			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 				<div class="flex flex-col md:flex-row justify-between items-center gap-4">
 					<div class="flex gap-6 text-sm">
@@ -426,7 +384,7 @@
 					</p>
 				</div>
 			</div>
-		</footer>
-
+			</footer>
+		</div>
 	</div>
 {/if}
