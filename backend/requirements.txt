@@ -36,5 +36,5 @@ flower==2.0.1
 anthropic
 
 # Email
-mailjunky>=0.1.0
+mailjunky>=0.1.1
 mailview>=0.1.0
