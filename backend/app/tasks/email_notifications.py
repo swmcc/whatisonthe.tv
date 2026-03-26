@@ -243,7 +243,14 @@ def send_daily_watchlist_emails(self) -> dict[str, Any]:
                 print("    ✅ Email sent!")
 
             except Exception as e:
-                error_msg = f"Failed to send email to {user.email}: {e}"
+                # Try to get more details from the exception
+                error_detail = str(e)
+                if hasattr(e, 'response'):
+                    try:
+                        error_detail = f"{e} - Response: {e.response.text}"
+                    except Exception:
+                        pass
+                error_msg = f"Failed to send email to {user.email}: {error_detail}"
                 print(f"    ❌ {error_msg}")
                 errors.append(error_msg)
 
