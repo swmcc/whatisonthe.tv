@@ -159,6 +159,15 @@ production.bash: ## Open bash shell on Heroku
 production.db.psql: ## Connect to Heroku PostgreSQL
 	heroku pg:psql --app whatisonthe-tv
 
+production.task.watchlist: ## Run watchlist update check on Heroku
+	heroku run --app whatisonthe-tv "cd backend && python -m bin.run_task watchlist"
+
+production.task.email: ## Send daily watchlist emails on Heroku
+	heroku run --app whatisonthe-tv "cd backend && python -m bin.run_task email"
+
+production.task: ## Run a task on Heroku (use TASK=name)
+	heroku run --app whatisonthe-tv "cd backend && python -m bin.run_task $(TASK)"
+
 # -----------------------------
 # 🧰 Meta
 # -----------------------------
