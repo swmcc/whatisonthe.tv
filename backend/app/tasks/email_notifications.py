@@ -235,8 +235,7 @@ def send_daily_watchlist_emails(self) -> dict[str, Any]:
                     subject=f"🎬 {len(updates)} update{'s' if len(updates) != 1 else ''} on your watchlist",
                     html_body=html_body,
                     text_body=text_body,
-                    tags=["watchlist", "daily-digest"],
-                    metadata={"user_id": str(user.id), "update_count": len(updates)},
+                    metadata={"user_id": str(user.id), "update_count": str(len(updates))},
                 )
 
                 emails_sent += 1
