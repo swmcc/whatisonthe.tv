@@ -42,8 +42,8 @@ class TestParseCharacterCredit:
             "name": "David",  # This is the character name
         }
         content_name, character_name = parse_character_credit(char)
-        # content_name should be "Unknown Project", NOT "David"
-        assert content_name == "Unknown Project"
+        # content_name should be None (to trigger DB/API lookup), NOT "David"
+        assert content_name is None
         assert character_name == "David"
 
     def test_prefers_series_name_over_movie_name(self):
@@ -68,14 +68,17 @@ class TestParseCharacterCredit:
         content_name, character_name = parse_character_credit(char)
         assert content_name == "The Movie"
 
-    def test_unknown_project_when_both_names_missing(self):
-        """Returns 'Unknown Project' when both series and movie names are missing."""
+    def test_returns_none_when_both_names_missing(self):
+        """Returns None for content_name when both series and movie names are missing.
+
+        The caller is responsible for looking up the name from DB/API.
+        """
         char = {
             "seriesId": 12345,
             "name": "Character",
         }
         content_name, character_name = parse_character_credit(char)
-        assert content_name == "Unknown Project"
+        assert content_name is None
 
     def test_uses_person_name_as_character_fallback(self):
         """Falls back to personName for character when name is missing."""
