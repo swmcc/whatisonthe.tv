@@ -14,7 +14,7 @@ from app.services.tvdb import tvdb_service
 from app.workers.celery_app import celery_app
 
 
-def parse_character_credit(char: dict[str, Any]) -> tuple[str, str]:
+def parse_character_credit(char: dict[str, Any]) -> tuple[str | None, str]:
     """
     Parse a character/credit dict from TVDB API to extract content and character names.
 
@@ -24,14 +24,46 @@ def parse_character_credit(char: dict[str, Any]) -> tuple[str, str]:
 
     Returns:
         Tuple of (content_name, character_name).
-        content_name is the series/movie title, or "Unknown Project" if unavailable.
+        content_name is the series/movie title, or None if not in the API response.
         character_name is the character name, or empty string if unavailable.
     """
     # Get content name - only use series/movie name, never fall back to character name
-    content_name = char.get("seriesName") or char.get("movieName") or "Unknown Project"
+    content_name = char.get("seriesName") or char.get("movieName") or None
     # Get character name
     character_name = char.get("name") or char.get("personName") or ""
     return content_name, character_name
+
+
+def _lookup_content_name(db, content_tvdb_id: int, is_series: bool) -> str | None:
+    """
+    Look up content name from DB or TVDB API.
+
+    Args:
+        db: Database session
+        content_tvdb_id: The TVDB ID of the series or movie
+        is_series: True if this is a series, False if movie
+
+    Returns:
+        The content name, or None if not found anywhere.
+    """
+    # First check local DB
+    stmt = select(Content).where(Content.tvdb_id == content_tvdb_id)
+    result = db.execute(stmt)
+    content = result.scalar_one_or_none()
+    if content and content.name:
+        return content.name
+
+    # Not in DB, fetch from TVDB API
+    if is_series:
+        api_data = tvdb_service.get_series_details(content_tvdb_id)
+        if api_data:
+            return api_data.get("name")
+    else:
+        api_data = tvdb_service.get_movie_details(content_tvdb_id)
+        if api_data:
+            return api_data.get("name")
+
+    return None
 
 
 @celery_app.task(bind=True, max_retries=3)
@@ -370,6 +402,12 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
             if credit_key not in known_credit_keys:
                 # New acting role found for this user
                 content_name, character_name = parse_character_credit(char)
+
+                # If API didn't include content name, look it up
+                if not content_name:
+                    content_name = _lookup_content_name(
+                        db, content_tvdb_id, is_series=bool(series_id)
+                    ) or "Unknown Project"
 
                 new_roles_for_user += 1
                 print(f"        → NEW ROLE: {content_name}")
