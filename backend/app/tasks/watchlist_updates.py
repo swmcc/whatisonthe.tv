@@ -7,11 +7,31 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db.database import SyncSessionLocal
-from app.models import Content, WatchlistItem, Season, Episode, Person, Credit, WatchlistPersonSnapshot, WatchlistContentSnapshot
+from app.models import Content, WatchlistItem, Season, Episode, Person, WatchlistPersonSnapshot, WatchlistContentSnapshot
 from app.models.watchlist import PersonRoleFilter
 from app.models.watchlist_update import WatchlistUpdate, UpdateType
 from app.services.tvdb import tvdb_service
 from app.workers.celery_app import celery_app
+
+
+def parse_character_credit(char: dict[str, Any]) -> tuple[str, str]:
+    """
+    Parse a character/credit dict from TVDB API to extract content and character names.
+
+    Args:
+        char: A character dict from TVDB API containing fields like
+              seriesName, movieName, name (character), personName.
+
+    Returns:
+        Tuple of (content_name, character_name).
+        content_name is the series/movie title, or "Unknown Project" if unavailable.
+        character_name is the character name, or empty string if unavailable.
+    """
+    # Get content name - only use series/movie name, never fall back to character name
+    content_name = char.get("seriesName") or char.get("movieName") or "Unknown Project"
+    # Get character name
+    character_name = char.get("name") or char.get("personName") or ""
+    return content_name, character_name
 
 
 @celery_app.task(bind=True, max_retries=3)
@@ -349,8 +369,7 @@ def _check_person_for_updates(db, person: Person, watchlist_items: list[Watchlis
             credit_key = (content_tvdb_id, "actor")
             if credit_key not in known_credit_keys:
                 # New acting role found for this user
-                content_name = char.get("seriesName") or char.get("movieName") or char.get("name") or "Unknown Project"
-                character_name = char.get("name") or char.get("personName") or ""
+                content_name, character_name = parse_character_credit(char)
 
                 new_roles_for_user += 1
                 print(f"        → NEW ROLE: {content_name}")
