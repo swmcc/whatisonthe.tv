@@ -13,9 +13,11 @@ content name from the database or TVDB API.
 
 import asyncio
 import sys
+from pathlib import Path
 
-# Add the app to path
-sys.path.insert(0, "/Users/swm/Code/whatisonthe.tv/backend")
+# Add the backend directory to path (works locally and on Heroku)
+backend_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_dir))
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
