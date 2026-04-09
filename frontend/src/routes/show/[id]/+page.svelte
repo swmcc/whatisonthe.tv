@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { api } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import CheckInModal from '$lib/components/CheckInModal.svelte';
@@ -16,6 +16,11 @@
 	let loadingSeasons = false;
 	let expandedSeasons = new Set<number>();
 	let checkedInEpisodes = new Set<number>();
+
+	// Sync status state
+	let syncStatus: 'idle' | 'syncing' = 'idle';
+	let syncType: 'new' | 'update' | null = null;
+	let syncPollInterval: ReturnType<typeof setInterval> | null = null;
 
 	// Check-in modal state
 	let showCheckInModal = false;
@@ -34,6 +39,46 @@
 	onMount(async () => {
 		await loadDetails();
 	});
+
+	onDestroy(() => {
+		if (syncPollInterval) {
+			clearInterval(syncPollInterval);
+			syncPollInterval = null;
+		}
+	});
+
+	async function checkSyncStatus() {
+		try {
+			const response = await api.search.getSyncStatus(parseInt(id));
+			const wasSyncing = syncStatus === 'syncing';
+			syncStatus = response.status;
+			syncType = response.sync_type;
+
+			if (response.status === 'syncing') {
+				// Start polling if not already
+				if (!syncPollInterval) {
+					syncPollInterval = setInterval(checkSyncStatus, 3000);
+				}
+			} else {
+				// Stop polling
+				if (syncPollInterval) {
+					clearInterval(syncPollInterval);
+					syncPollInterval = null;
+				}
+				// Reload seasons if we were syncing or have none
+				if (wasSyncing || seasons.length === 0) {
+					await loadSeasons();
+					// Switch to seasons tab if seasons are now available and no cast
+					if (seasons.length > 0 && (!data?.characters || data.characters.length === 0)) {
+						activeMainTab = 'seasons';
+					}
+				}
+			}
+		} catch (e) {
+			console.error('Failed to check sync status:', e);
+			syncStatus = 'idle';
+		}
+	}
 
 	async function loadDetails() {
 		loading = true;
@@ -72,9 +117,9 @@
 			loading = false;
 		}
 
-		// If it's a series, load seasons and check-ins
+		// If it's a series, load seasons, check-ins, and sync status
 		if (isSeries && data) {
-			await Promise.all([loadSeasons(), loadCheckins()]);
+			await Promise.all([loadSeasons(), loadCheckins(), checkSyncStatus()]);
 		}
 	}
 
@@ -319,7 +364,7 @@
 		</div>
 
 		<!-- Cast & Crew and Seasons -->
-		{#if (data.characters && data.characters.length > 0) || (isSeries && seasons.length > 0)}
+		{#if (data.characters && data.characters.length > 0) || (isSeries && seasons.length > 0) || (isSeries && syncStatus === 'syncing')}
 			{@const sortedCharacters = data.characters ? [...data.characters].sort((a, b) => (a.sort || 999) - (b.sort || 999)) : []}
 			{@const actors = sortedCharacters.filter(c => c.peopleType === 'Actor')}
 			{@const directors = sortedCharacters.filter(c => c.peopleType === 'Director')}
@@ -340,14 +385,24 @@
 								Cast & Crew
 							</button>
 						{/if}
-						{#if isSeries && seasons.length > 0}
-							<button
-								on:click={() => activeMainTab = 'seasons'}
-								class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-base transition-colors
-									{activeMainTab === 'seasons' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
-							>
-								Seasons ({seasons.length})
-							</button>
+						{#if isSeries}
+							{#if syncStatus === 'syncing'}
+								<span class="whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-base text-gray-400 cursor-not-allowed flex items-center gap-2">
+									<svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									{syncType === 'new' ? 'Retrieving episode info' : 'Updating episode info'}
+								</span>
+							{:else if seasons.length > 0}
+								<button
+									on:click={() => activeMainTab = 'seasons'}
+									class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-base transition-colors
+										{activeMainTab === 'seasons' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+								>
+									Seasons ({seasons.length})
+								</button>
+							{/if}
 						{/if}
 					</nav>
 				</div>
