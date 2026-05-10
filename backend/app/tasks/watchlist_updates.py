@@ -204,6 +204,8 @@ def _check_content_for_updates(db, content: Content, watchlist_items: list[Watch
         updates_created += _create_status_update(
             db, content, watchlist_items, content.status, new_status
         )
+        # Update the content status so we don't create duplicate updates
+        content.status = new_status
 
     # Check for new seasons
     api_seasons = api_data.get("seasons", [])
