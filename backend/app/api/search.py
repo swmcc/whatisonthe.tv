@@ -1,11 +1,16 @@
 """Search API endpoints."""
 
+from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
+from app.models.content import Content
+from app.models.season import Season
 from app.services.content_repository import ContentRepository
+from app.workers.celery_app import celery_app
 
 router = APIRouter()
 
@@ -201,3 +206,72 @@ async def get_season_episodes(
     repo = ContentRepository(db)
     episodes = await repo.get_season_episodes(series_id, season_number)
     return {"season_number": season_number, "episodes": episodes, "count": len(episodes)}
+
+
+class SyncStatusResponse(BaseModel):
+    """Sync status response model."""
+
+    status: str  # 'idle' or 'syncing'
+    sync_type: str | None  # 'new' or 'update' or null
+    has_seasons: bool
+
+
+@router.get("/series/{series_id}/sync-status", response_model=SyncStatusResponse)
+async def get_series_sync_status(series_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Get the sync status for a TV series.
+
+    Returns whether the series is currently being synced, and whether this is
+    a new sync (first-time fetch) or an update (refreshing existing data).
+
+    Args:
+        series_id: TVDB series ID
+
+    Returns:
+        Sync status information
+    """
+    # Find content by tvdb_id
+    stmt = select(Content).where(
+        Content.tvdb_id == series_id,
+        Content.content_type == "series"
+    )
+    result = await db.execute(stmt)
+    content = result.scalar_one_or_none()
+
+    if not content:
+        # Content doesn't exist yet - check if there's a pending task
+        # For now, return idle - the task will create the content
+        return SyncStatusResponse(
+            status="idle",
+            sync_type=None,
+            has_seasons=False
+        )
+
+    # Check if seasons exist
+    stmt = select(Season).where(Season.content_id == content.id).limit(1)
+    result = await db.execute(stmt)
+    has_seasons = result.scalar_one_or_none() is not None
+
+    # Determine sync_type based on whether seasons exist
+    sync_type = "update" if has_seasons else "new"
+
+    # Check if sync_task_id exists and task is still running
+    if content.sync_task_id:
+        try:
+            task_result = AsyncResult(content.sync_task_id, app=celery_app)
+            # Check if task is still pending or started (not finished)
+            if task_result.state in ("PENDING", "STARTED", "RETRY"):
+                return SyncStatusResponse(
+                    status="syncing",
+                    sync_type=sync_type,
+                    has_seasons=has_seasons
+                )
+        except Exception:
+            # If we can't check the task, assume it's done
+            pass
+
+    return SyncStatusResponse(
+        status="idle",
+        sync_type=None,
+        has_seasons=has_seasons
+    )

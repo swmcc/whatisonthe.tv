@@ -38,18 +38,31 @@ def save_series_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None)
     time.sleep(jitter)
 
     start_time = datetime.utcnow()
+    task_id = self.request.id
 
     with SyncSessionLocal() as db:
         try:
+            # Set sync_task_id on content if it exists
+            stmt = select(Content).where(Content.tvdb_id == tvdb_id, Content.content_type == "series")
+            result = db.execute(stmt)
+            existing_content = result.scalar_one_or_none()
+            if existing_content:
+                existing_content.sync_task_id = task_id
+                db.commit()
+
             # Fetch from API if not provided
             if not api_data:
                 api_data = tvdb_service.get_series_details(tvdb_id)
 
             if not api_data:
+                # Clear sync_task_id on failure
+                if existing_content:
+                    existing_content.sync_task_id = None
+                    db.commit()
                 _log_sync_failure(db, "content", tvdb_id, "Series not found in TVDB API")
                 return {"status": "failed", "error": "Series not found"}
 
-            # Check if content already exists
+            # Check if content already exists (re-query in case it was created)
             stmt = select(Content).where(Content.tvdb_id == tvdb_id, Content.content_type == "series")
             result = db.execute(stmt)
             content = result.scalar_one_or_none()
@@ -61,6 +74,8 @@ def save_series_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None)
                 # Create new
                 content = _create_series(db, tvdb_id, api_data)
 
+            # Set sync_task_id on content (for new content or ensure it's set)
+            content.sync_task_id = task_id
             db.commit()
             db.refresh(content)
 
@@ -72,6 +87,8 @@ def save_series_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None)
             # Save seasons and episodes for series
             _save_seasons_and_episodes(db, content, tvdb_id, api_data)
 
+            # Clear sync_task_id on success
+            content.sync_task_id = None
             db.commit()
 
             # Log success
@@ -83,6 +100,16 @@ def save_series_full(self, tvdb_id: int, api_data: dict[str, Any] | None = None)
 
         except Exception as e:
             db.rollback()
+            # Clear sync_task_id on failure
+            try:
+                stmt = select(Content).where(Content.tvdb_id == tvdb_id, Content.content_type == "series")
+                result = db.execute(stmt)
+                content = result.scalar_one_or_none()
+                if content:
+                    content.sync_task_id = None
+                    db.commit()
+            except Exception:
+                pass  # Don't fail if cleanup fails
             _log_sync_failure(db, "content", tvdb_id, str(e))
             db.commit()
             raise
