@@ -37,12 +37,16 @@ class Settings(BaseSettings):
     tvdb_pin: str = ""
 
     # CORS - can be a comma-separated string or list
-    cors_origins: Union[list[str], str] = "http://localhost:5173,http://localhost:5174,http://localhost:3000"
+    cors_origins: Union[list[str], str] = (
+        "http://localhost:5173,http://localhost:5174,http://localhost:3000,"
+        "capacitor://localhost,https://localhost"
+    )
 
     # Security
     secret_key: str = "your-secret-key-change-in-production-min-32-chars-long"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+    access_token_expire_minutes: int = 60 * 24  # 24 hours
+    refresh_token_expire_minutes: int = 60 * 24 * 180  # ~180 days
 
     # LLM Configuration
     llm_provider: str = "anthropic"  # "anthropic" or "openai"

@@ -1,6 +1,6 @@
 """Checkin schemas."""
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Optional
 
@@ -26,6 +26,7 @@ class CheckinBase(BaseModel):
     watched_with: Optional[str] = Field(None, max_length=255, description="Who the content was watched with")
     notes: Optional[str] = Field(None, description="Additional notes about the viewing")
     focus: Optional[FocusLevel] = Field(None, description="Focus level during viewing (focused, distracted, background, sleep)")
+    client_uuid: Optional[str] = Field(None, max_length=36, description="Client-generated UUID for idempotent check-in creation")
 
 
 class CheckinCreate(CheckinBase):
@@ -82,3 +83,46 @@ class CheckinResponse(CheckinBase):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ContinueWatchingContent(BaseModel):
+    """Series summary for a continue-watching entry."""
+
+    tvdb_id: int
+    name: str
+    content_type: str
+    year: Optional[int] = None
+    image_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ContinueWatchingEpisode(BaseModel):
+    """The next unwatched episode of a series."""
+
+    tvdb_id: int
+    name: Optional[str] = None
+    season_number: int
+    episode_number: int
+    aired: Optional[date] = None
+    runtime: Optional[int] = None
+    image_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ContinueWatchingItem(BaseModel):
+    """A series the user has started but not finished."""
+
+    content: ContinueWatchingContent
+    next_episode: ContinueWatchingEpisode
+    last_watched_at: datetime
+    watched_episodes: int
+    total_episodes: int
+
+
+class ContinueWatchingResponse(BaseModel):
+    """Response body for the continue-watching endpoint."""
+
+    items: list[ContinueWatchingItem]
+    generated_at: datetime
