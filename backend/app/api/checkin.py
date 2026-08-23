@@ -2,8 +2,9 @@
 
 import asyncio
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -124,9 +125,29 @@ async def _create_basic_series(db: AsyncSession, tvdb_id: int, api_data: dict) -
     return content
 
 
+async def _get_checkin_by_client_uuid(db: AsyncSession, client_uuid: str) -> Checkin | None:
+    """
+    Look up an existing checkin by its client-generated UUID.
+
+    Args:
+        db: Database session
+        client_uuid: Client-generated UUID supplied with the check-in
+
+    Returns:
+        Matching Checkin with content/episode loaded, or None
+    """
+    result = await db.execute(
+        select(Checkin)
+        .where(Checkin.client_uuid == client_uuid)
+        .options(selectinload(Checkin.content), selectinload(Checkin.episode))
+    )
+    return result.scalar_one_or_none()
+
+
 @router.post("", response_model=CheckinResponse, status_code=status.HTTP_201_CREATED)
 async def create_checkin(
     checkin_data: CheckinCreate,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -138,15 +159,30 @@ async def create_checkin(
 
     Args:
         checkin_data: Checkin creation data (content_id is TVDB ID)
+        response: Response object, used to downgrade the status code on replays
         current_user: Current authenticated user
         db: Database session
 
     Returns:
-        Created checkin
+        Created checkin, or the existing one (with a 200 status) when the
+        supplied client_uuid has already been used by this user
 
     Raises:
-        HTTPException: If content or episode cannot be found/created
+        HTTPException: If content or episode cannot be found/created, or if the
+            client_uuid belongs to another user
     """
+    # Idempotency: a replayed client_uuid returns the existing checkin unchanged
+    if checkin_data.client_uuid:
+        existing = await _get_checkin_by_client_uuid(db, checkin_data.client_uuid)
+        if existing:
+            if existing.user_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="client_uuid already used by another user",
+                )
+            response.status_code = status.HTTP_200_OK
+            return CheckinResponse.model_validate(existing)
+
     # Quick check if content already exists in DB
     content = await _get_content_with_retry(db, checkin_data.content_id, max_retries=1, delay=0)
 
@@ -221,10 +257,30 @@ async def create_checkin(
         watched_with=checkin_data.watched_with,
         notes=checkin_data.notes,
         focus=checkin_data.focus,
+        client_uuid=checkin_data.client_uuid,
     )
 
     db.add(checkin)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Concurrent double-submit lost the race on the unique client_uuid index
+        await db.rollback()
+        existing = (
+            await _get_checkin_by_client_uuid(db, checkin_data.client_uuid)
+            if checkin_data.client_uuid
+            else None
+        )
+        if existing is None:
+            raise
+        if existing.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="client_uuid already used by another user",
+            )
+        response.status_code = status.HTTP_200_OK
+        return CheckinResponse.model_validate(existing)
+
     await db.refresh(checkin)
 
     # Load relationships for response
