@@ -193,6 +193,17 @@ This application is designed to be easily self-hosted on a cheap VPS.
 - Caddy for HTTPS
 - Systemd service files
 
+### CORS Configuration
+
+Allowed browser origins are configured with the `CORS_ORIGINS` environment
+variable (comma-separated). The mobile app runs from the Capacitor origins, so
+enabling it means appending `capacitor://localhost` and `https://localhost` to
+the existing origins:
+
+```bash
+heroku config:set CORS_ORIGINS="https://whatisonthe.tv,capacitor://localhost,https://localhost"
+```
+
 ## External Integrations (Future)
 
 - Apple TV+ viewing history

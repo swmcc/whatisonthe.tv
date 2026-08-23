@@ -42,6 +42,10 @@ async def get_current_user(
     if payload is None:
         raise credentials_exception
 
+    # Refresh tokens are only valid at /api/auth/refresh, never as access tokens
+    if payload.get("type") == "refresh":
+        raise credentials_exception
+
     # JWT sub field (user ID as string)
     user_id_str = payload.get("sub")
     if user_id_str is None:
