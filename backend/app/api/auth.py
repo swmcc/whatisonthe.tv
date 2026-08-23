@@ -5,12 +5,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
-from app.core.security import create_access_token, get_password_hash, verify_password
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_access_token,
+    get_password_hash,
+    verify_password,
+)
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
+    RefreshRequest,
+    RefreshResponse,
     UserPasswordUpdate,
     UserResponse,
     UserUpdate,
@@ -48,12 +56,72 @@ async def login(
             detail="Incorrect email or password",
         )
 
-    # Create access token (sub must be string for python-jose)
+    # Create tokens (sub must be string for python-jose)
     access_token = create_access_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
 
     return LoginResponse(
         access_token=access_token,
+        refresh_token=refresh_token,
         user=UserResponse.model_validate(user),
+    )
+
+
+@router.post("/refresh", response_model=RefreshResponse)
+async def refresh_tokens(
+    refresh_data: RefreshRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Exchange a valid refresh token for a new access and refresh token pair.
+
+    Refresh tokens are rotated on every use. No server-side state is kept, so
+    the previous refresh token remains valid until it expires naturally.
+
+    Args:
+        refresh_data: Refresh token payload
+        db: Database session
+
+    Returns:
+        A new access token and refresh token
+
+    Raises:
+        HTTPException: If the refresh token is invalid, expired, of the wrong
+            type, or the user no longer exists
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid refresh token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    payload = decode_access_token(refresh_data.refresh_token)
+    if payload is None:
+        raise credentials_exception
+
+    # Access tokens must never be accepted here
+    if payload.get("type") != "refresh":
+        raise credentials_exception
+
+    user_id_str = payload.get("sub")
+    if user_id_str is None:
+        raise credentials_exception
+
+    try:
+        user_id = int(user_id_str)
+    except (ValueError, TypeError):
+        raise credentials_exception
+
+    # Ensure the user still exists
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise credentials_exception
+
+    return RefreshResponse(
+        access_token=create_access_token(data={"sub": str(user_id)}),
+        refresh_token=create_refresh_token(data={"sub": str(user_id)}),
     )
 
 
