@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,6 +16,12 @@ from app.models.user import User
 from app.models.series_detail import SeriesDetail
 from app.models.movie_detail import MovieDetail
 from app.schemas.checkin import CheckinCreate, CheckinResponse, CheckinUpdate
+from app.schemas.checkin import (
+    ContinueWatchingContent,
+    ContinueWatchingEpisode,
+    ContinueWatchingItem,
+    ContinueWatchingResponse,
+)
 from app.services.content_repository import ContentRepository
 
 router = APIRouter(prefix="/checkins", tags=["checkins"])
@@ -299,6 +305,211 @@ async def list_checkins(
     filtered_checkins.sort(key=lambda c: c.watched_at, reverse=True)
 
     return [CheckinResponse.model_validate(checkin) for checkin in filtered_checkins]
+
+
+CONTINUE_WATCHING_LIMIT = 20
+
+
+def _select_next_episode(
+    episodes: list[Episode], watched_episode_ids: set[int]
+) -> Episode | None:
+    """
+    Pick the next episode to watch for a series.
+
+    Specials (season 0) are never candidates.
+
+    Args:
+        episodes: Episodes belonging to the series
+        watched_episode_ids: Internal episode ids the user has checked in to
+
+    Returns:
+        The unwatched episode with the lowest (season, episode) number,
+        or None if every non-special episode has been watched
+    """
+    candidates = [
+        episode
+        for episode in episodes
+        if episode.season_number > 0 and episode.id not in watched_episode_ids
+    ]
+    if not candidates:
+        return None
+
+    return min(candidates, key=lambda e: (e.season_number, e.episode_number))
+
+
+def _count_episodes(
+    episodes: list[Episode], watched_episode_ids: set[int]
+) -> tuple[int, int]:
+    """
+    Count watched and total episodes for a series, ignoring specials.
+
+    Args:
+        episodes: Episodes belonging to the series
+        watched_episode_ids: Internal episode ids the user has checked in to
+
+    Returns:
+        Tuple of (watched episode count, total episode count)
+    """
+    regular = [episode for episode in episodes if episode.season_number > 0]
+    watched = sum(1 for episode in regular if episode.id in watched_episode_ids)
+
+    return watched, len(regular)
+
+
+def _build_continue_watching_item(
+    content: Content,
+    episodes: list[Episode],
+    watched_episode_ids: set[int],
+    last_watched_at: datetime,
+) -> ContinueWatchingItem | None:
+    """
+    Build a single continue-watching entry for a series.
+
+    Args:
+        content: The series
+        episodes: Episodes belonging to the series
+        watched_episode_ids: Internal episode ids the user has checked in to
+        last_watched_at: When the user last checked in to this series
+
+    Returns:
+        The continue-watching item, or None if the series has nothing left
+        to watch (fully watched, or specials only)
+    """
+    next_episode = _select_next_episode(episodes, watched_episode_ids)
+    if next_episode is None:
+        return None
+
+    watched_episodes, total_episodes = _count_episodes(episodes, watched_episode_ids)
+
+    return ContinueWatchingItem(
+        content=ContinueWatchingContent.model_validate(content),
+        next_episode=ContinueWatchingEpisode.model_validate(next_episode),
+        last_watched_at=last_watched_at,
+        watched_episodes=watched_episodes,
+        total_episodes=total_episodes,
+    )
+
+
+def _build_continue_watching_items(
+    last_watched_by_content: list[tuple[int, datetime]],
+    contents: dict[int, Content],
+    episodes_by_content: dict[int, list[Episode]],
+    watched_episode_ids: set[int],
+    limit: int = CONTINUE_WATCHING_LIMIT,
+) -> list[ContinueWatchingItem]:
+    """
+    Build the continue-watching list, preserving order and applying the cap.
+
+    Args:
+        last_watched_by_content: (content id, last watched at) pairs, most
+            recently watched first
+        contents: Series keyed by internal content id
+        episodes_by_content: Episodes keyed by internal content id
+        watched_episode_ids: Internal episode ids the user has checked in to
+        limit: Maximum number of items to return
+
+    Returns:
+        Continue-watching items, capped at limit
+    """
+    items: list[ContinueWatchingItem] = []
+
+    for content_id, last_watched_at in last_watched_by_content:
+        content = contents.get(content_id)
+        if content is None:
+            continue
+
+        item = _build_continue_watching_item(
+            content,
+            episodes_by_content.get(content_id, []),
+            watched_episode_ids,
+            last_watched_at,
+        )
+        if item is None:
+            continue
+
+        items.append(item)
+        if len(items) >= limit:
+            break
+
+    return items
+
+
+@router.get("/continue-watching", response_model=ContinueWatchingResponse)
+async def continue_watching(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List series the current user has started but not finished.
+
+    Series are ordered by the user's most recent check-in and capped at
+    CONTINUE_WATCHING_LIMIT entries. Specials (season 0) are ignored, and
+    series with no unwatched episode left are omitted. Movies are excluded.
+
+    Args:
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Continue-watching items plus the time the list was generated
+    """
+    # Most recent check-in per series, newest first
+    result = await db.execute(
+        select(
+            Checkin.content_id,
+            func.max(Checkin.watched_at).label("last_watched_at"),
+        )
+        .join(Content, Content.id == Checkin.content_id)
+        .where(
+            Checkin.user_id == current_user.id,
+            Content.content_type == "series",
+        )
+        .group_by(Checkin.content_id)
+        .order_by(func.max(Checkin.watched_at).desc())
+    )
+    last_watched_by_content = [
+        (row.content_id, row.last_watched_at) for row in result.all()
+    ]
+
+    if not last_watched_by_content:
+        return ContinueWatchingResponse(items=[], generated_at=datetime.utcnow())
+
+    content_ids = [content_id for content_id, _ in last_watched_by_content]
+
+    # Series metadata
+    result = await db.execute(select(Content).where(Content.id.in_(content_ids)))
+    contents = {content.id: content for content in result.scalars().all()}
+
+    # Every non-special episode of those series
+    result = await db.execute(
+        select(Episode)
+        .where(Episode.content_id.in_(content_ids), Episode.season_number > 0)
+        .order_by(Episode.season_number, Episode.episode_number)
+    )
+    episodes_by_content: dict[int, list[Episode]] = {}
+    for episode in result.scalars().all():
+        episodes_by_content.setdefault(episode.content_id, []).append(episode)
+
+    # Episodes of those series the user has already checked in to
+    result = await db.execute(
+        select(Checkin.episode_id)
+        .where(
+            Checkin.user_id == current_user.id,
+            Checkin.content_id.in_(content_ids),
+            Checkin.episode_id.is_not(None),
+        )
+        .distinct()
+    )
+    watched_episode_ids = set(result.scalars().all())
+
+    items = _build_continue_watching_items(
+        last_watched_by_content,
+        contents,
+        episodes_by_content,
+        watched_episode_ids,
+    )
+
+    return ContinueWatchingResponse(items=items, generated_at=datetime.utcnow())
 
 
 @router.get("/{checkin_id}", response_model=CheckinResponse)
