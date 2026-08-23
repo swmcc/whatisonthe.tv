@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.config import Settings, settings
+from app.core.config import Settings
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -173,5 +173,6 @@ class TestSettingsDefaults:
 
     def test_token_expiry_defaults(self):
         """Access tokens last 24 hours, refresh tokens ~180 days."""
-        assert settings.access_token_expire_minutes == 60 * 24
-        assert settings.refresh_token_expire_minutes == 60 * 24 * 180
+        defaults = Settings(_env_file=None)
+        assert defaults.access_token_expire_minutes == 60 * 24
+        assert defaults.refresh_token_expire_minutes == 60 * 24 * 180
