@@ -26,6 +26,7 @@ class CheckinBase(BaseModel):
     watched_with: Optional[str] = Field(None, max_length=255, description="Who the content was watched with")
     notes: Optional[str] = Field(None, description="Additional notes about the viewing")
     focus: Optional[FocusLevel] = Field(None, description="Focus level during viewing (focused, distracted, background, sleep)")
+    client_uuid: Optional[str] = Field(None, max_length=36, description="Client-generated UUID for idempotent check-in creation")
 
 
 class CheckinCreate(CheckinBase):

@@ -44,6 +44,9 @@ class Checkin(Base):
         Enum(FocusLevel, name="focuslevel", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=True,
     )
+    client_uuid: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True, unique=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )
