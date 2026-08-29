@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, Enum as SQLEnum, Index
+from sqlalchemy import DateTime, Float, Integer, String, Text, Enum as SQLEnum, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -28,8 +28,9 @@ class Content(Base):
     # Primary key
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
-    # TVDB reference
-    tvdb_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+    # TVDB reference. Not unique on its own: TVDB movie and series IDs are
+    # separate namespaces, so the same number can be a movie AND a series
+    tvdb_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
     # Content type
     content_type: Mapped[str] = mapped_column(
@@ -170,6 +171,7 @@ class Content(Base):
     __table_args__ = (
         Index('idx_content_popularity', 'popularity_score'),
         Index('idx_content_name_search', 'name'),
+        UniqueConstraint('tvdb_id', 'content_type', name='uq_content_tvdb_id_content_type'),
     )
 
     def __repr__(self) -> str:

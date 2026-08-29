@@ -65,6 +65,7 @@
 			} else {
 				await api.checkin.create({
 					content_id: contentId,
+					content_type: contentType,
 					episode_id: episodeId || undefined,
 					watched_at: new Date(watchedAt).toISOString(),
 					location: location || undefined,

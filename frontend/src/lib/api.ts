@@ -176,6 +176,7 @@ export const api = {
 	checkin: {
 		create: async (data: {
 			content_id: number;
+			content_type?: 'series' | 'movie';
 			episode_id?: number;
 			watched_at: string;
 			location?: string;

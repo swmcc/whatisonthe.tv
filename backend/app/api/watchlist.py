@@ -78,9 +78,12 @@ async def add_content_to_watchlist(
     Raises:
         HTTPException: If content not found or already in watchlist
     """
-    # Find content by TVDB ID
-    result = await db.execute(select(Content).where(Content.tvdb_id == watchlist_data.tvdb_id))
-    content = result.scalar_one_or_none()
+    # Find content by TVDB ID. A movie and a series can share a TVDB ID
+    # (separate namespaces); prefer the oldest row for deterministic behaviour
+    result = await db.execute(
+        select(Content).where(Content.tvdb_id == watchlist_data.tvdb_id).order_by(Content.id)
+    )
+    content = result.scalars().first()
 
     # If not in DB, fetch from TVDB and create basic record
     if not content:
@@ -336,11 +339,11 @@ async def update_content_watchlist(
     Raises:
         HTTPException: If content not found in watchlist
     """
-    # Find content by TVDB ID
-    content_result = await db.execute(select(Content).where(Content.tvdb_id == tvdb_id))
-    content = content_result.scalar_one_or_none()
+    # Find content by TVDB ID (movie and series namespaces can share an ID)
+    content_result = await db.execute(select(Content.id).where(Content.tvdb_id == tvdb_id))
+    content_ids = content_result.scalars().all()
 
-    if not content:
+    if not content_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Content with TVDB ID {tvdb_id} not found",
@@ -350,10 +353,10 @@ async def update_content_watchlist(
     result = await db.execute(
         select(WatchlistItem).where(
             WatchlistItem.user_id == current_user.id,
-            WatchlistItem.content_id == content.id,
+            WatchlistItem.content_id.in_(content_ids),
         )
     )
-    item = result.scalar_one_or_none()
+    item = result.scalars().first()
 
     if not item:
         raise HTTPException(
@@ -463,11 +466,11 @@ async def remove_content_from_watchlist(
     Raises:
         HTTPException: If content not found in watchlist
     """
-    # Find content by TVDB ID
-    content_result = await db.execute(select(Content).where(Content.tvdb_id == tvdb_id))
-    content = content_result.scalar_one_or_none()
+    # Find content by TVDB ID (movie and series namespaces can share an ID)
+    content_result = await db.execute(select(Content.id).where(Content.tvdb_id == tvdb_id))
+    content_ids = content_result.scalars().all()
 
-    if not content:
+    if not content_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Content with TVDB ID {tvdb_id} not found",
@@ -477,10 +480,10 @@ async def remove_content_from_watchlist(
     result = await db.execute(
         select(WatchlistItem).where(
             WatchlistItem.user_id == current_user.id,
-            WatchlistItem.content_id == content.id,
+            WatchlistItem.content_id.in_(content_ids),
         )
     )
-    item = result.scalar_one_or_none()
+    item = result.scalars().first()
 
     if not item:
         raise HTTPException(
@@ -559,11 +562,11 @@ async def check_content_in_watchlist(
     Returns:
         Whether content is in watchlist and the item if it exists
     """
-    # Find content by TVDB ID
-    content_result = await db.execute(select(Content).where(Content.tvdb_id == tvdb_id))
-    content = content_result.scalar_one_or_none()
+    # Find content by TVDB ID (movie and series namespaces can share an ID)
+    content_result = await db.execute(select(Content.id).where(Content.tvdb_id == tvdb_id))
+    content_ids = content_result.scalars().all()
 
-    if not content:
+    if not content_ids:
         return WatchlistCheckResponse(in_watchlist=False, item=None)
 
     # Find watchlist item
@@ -571,11 +574,11 @@ async def check_content_in_watchlist(
         select(WatchlistItem)
         .where(
             WatchlistItem.user_id == current_user.id,
-            WatchlistItem.content_id == content.id,
+            WatchlistItem.content_id.in_(content_ids),
         )
         .options(selectinload(WatchlistItem.content), selectinload(WatchlistItem.person))
     )
-    item = result.scalar_one_or_none()
+    item = result.scalars().first()
 
     if item:
         return WatchlistCheckResponse(

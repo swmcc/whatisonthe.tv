@@ -23,13 +23,16 @@ from app.schemas.checkin import (
     ContinueWatchingItem,
     ContinueWatchingResponse,
 )
-from app.services.content_repository import ContentRepository
 
 router = APIRouter(prefix="/checkins", tags=["checkins"])
 
 
 async def _get_content_with_retry(
-    db: AsyncSession, tvdb_id: int, max_retries: int = 3, delay: float = 0.5
+    db: AsyncSession,
+    tvdb_id: int,
+    content_type: str | None = None,
+    max_retries: int = 3,
+    delay: float = 0.5,
 ) -> Content | None:
     """
     Get content from DB with retry logic (for background save completion).
@@ -37,17 +40,20 @@ async def _get_content_with_retry(
     Args:
         db: Database session
         tvdb_id: TVDB ID of content
+        content_type: "series" or "movie" to disambiguate the TVDB namespace;
+            None matches either (legacy callers)
         max_retries: Maximum number of retry attempts
         delay: Delay between retries in seconds
 
     Returns:
         Content object or None
     """
+    query = select(Content).where(Content.tvdb_id == tvdb_id)
+    if content_type is not None:
+        query = query.where(Content.content_type == content_type)
     for attempt in range(max_retries):
-        result = await db.execute(
-            select(Content).where(Content.tvdb_id == tvdb_id)
-        )
-        content = result.scalar_one_or_none()
+        result = await db.execute(query)
+        content = result.scalars().first()
         if content:
             return content
         if attempt < max_retries - 1:
@@ -189,21 +195,35 @@ async def create_checkin(
             response.status_code = status.HTTP_200_OK
             return CheckinResponse.model_validate(existing)
 
+    # TVDB movie and series IDs are separate namespaces; an episode check-in is
+    # a series by definition even when the client doesn't say so
+    expected_type = checkin_data.content_type.value if checkin_data.content_type else None
+    if expected_type is None and checkin_data.episode_id:
+        expected_type = "series"
+
     # Quick check if content already exists in DB
-    content = await _get_content_with_retry(db, checkin_data.content_id, max_retries=1, delay=0)
+    content = await _get_content_with_retry(
+        db, checkin_data.content_id, content_type=expected_type, max_retries=1, delay=0
+    )
 
     # If not in DB, fetch and save basic content record immediately
     if not content:
         from app.services.tvdb import tvdb_service
         from app.tasks.content import save_movie_full, save_series_full
 
-        # Fetch from TVDB API
-        api_data = tvdb_service.get_movie_details(checkin_data.content_id)
-        is_movie = True
-
-        if not api_data:
+        # Fetch from TVDB API, honouring the requested namespace when known
+        if expected_type == "series":
             api_data = tvdb_service.get_series_details(checkin_data.content_id)
             is_movie = False
+        elif expected_type == "movie":
+            api_data = tvdb_service.get_movie_details(checkin_data.content_id)
+            is_movie = True
+        else:
+            api_data = tvdb_service.get_movie_details(checkin_data.content_id)
+            is_movie = True
+            if not api_data:
+                api_data = tvdb_service.get_series_details(checkin_data.content_id)
+                is_movie = False
 
         if not api_data:
             raise HTTPException(
@@ -319,7 +339,7 @@ async def list_checkins(
     Returns:
         List of user's checkins for the requested days
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     # Build query
     query = (
@@ -724,18 +744,19 @@ async def list_content_checkins(
     Returns:
         List of checkins for the content
     """
-    # First, find the content by TVDB ID
+    # A TVDB ID can match both a movie and a series (separate namespaces), so
+    # collect checkins across every matching content row
     content_result = await db.execute(
-        select(Content).where(Content.tvdb_id == tvdb_id)
+        select(Content.id).where(Content.tvdb_id == tvdb_id)
     )
-    content = content_result.scalar_one_or_none()
+    content_ids = content_result.scalars().all()
 
-    if not content:
+    if not content_ids:
         return []
 
     result = await db.execute(
         select(Checkin)
-        .where(Checkin.user_id == current_user.id, Checkin.content_id == content.id)
+        .where(Checkin.user_id == current_user.id, Checkin.content_id.in_(content_ids))
         .options(selectinload(Checkin.content), selectinload(Checkin.episode))
         .order_by(Checkin.watched_at.desc())
     )
@@ -766,7 +787,7 @@ async def list_public_checkins(
     Raises:
         HTTPException: If user not found or has no username set
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     # Find user by username
     result = await db.execute(select(User).where(User.username == username))

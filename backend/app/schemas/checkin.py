@@ -7,6 +7,13 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class ContentType(str, Enum):
+    """TVDB content namespace."""
+
+    SERIES = "series"
+    MOVIE = "movie"
+
+
 class FocusLevel(str, Enum):
     """Focus level during viewing."""
 
@@ -32,7 +39,14 @@ class CheckinBase(BaseModel):
 class CheckinCreate(CheckinBase):
     """Schema for creating a checkin."""
 
-    pass
+    content_type: Optional[ContentType] = Field(
+        None,
+        description=(
+            "Whether content_id refers to a series or a movie. TVDB uses separate "
+            "ID namespaces, so the same number can be both; omitting this falls "
+            "back to guessing (movie first), which can resolve the wrong title."
+        ),
+    )
 
 
 class CheckinUpdate(BaseModel):
