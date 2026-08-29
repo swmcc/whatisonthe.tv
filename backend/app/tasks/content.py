@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from app.db.database import SyncSessionLocal
 from app.models.content import Content
@@ -476,7 +475,7 @@ def _save_seasons_and_episodes(db, content: Content, tvdb_id: int, api_data: dic
             try:
                 from datetime import datetime as dt
                 aired_date = dt.strptime(aired_str, "%Y-%m-%d").date()
-            except:
+            except (ValueError, TypeError):
                 pass
 
         # Check if episode already exists by (season_number, episode_number)
