@@ -46,10 +46,14 @@ def _lookup_content_name(db, content_tvdb_id: int, is_series: bool) -> str | Non
     Returns:
         The content name, or None if not found anywhere.
     """
-    # First check local DB
-    stmt = select(Content).where(Content.tvdb_id == content_tvdb_id)
+    # First check local DB, filtering by type since movie and series TVDB IDs
+    # are separate namespaces and can collide
+    stmt = select(Content).where(
+        Content.tvdb_id == content_tvdb_id,
+        Content.content_type == ("series" if is_series else "movie"),
+    )
     result = db.execute(stmt)
-    content = result.scalar_one_or_none()
+    content = result.scalars().first()
     if content and content.name:
         return content.name
 
