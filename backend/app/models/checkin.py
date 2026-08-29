@@ -2,12 +2,17 @@
 
 import enum
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+
+if TYPE_CHECKING:
+    from app.models.content import Content
+    from app.models.episode import Episode
+    from app.models.user import User
 
 
 class FocusLevel(str, enum.Enum):

@@ -1,9 +1,13 @@
 """LLM abstraction layer for AI-powered recommendations."""
 
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Optional
+from typing import TYPE_CHECKING, AsyncIterator, Optional
 
 from app.core.config import settings
+
+if TYPE_CHECKING:
+    import anthropic
+    import openai
 
 
 class LLMProvider(ABC):
